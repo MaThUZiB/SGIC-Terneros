@@ -38,6 +38,9 @@ INSTALLED_APPS = [
     'corsheaders',
     #CREATED
     'apps.inventario',
+    'apps.animales',
+    'apps.lotes',
+    'apps.compras',
 ]
 
 MIDDLEWARE = [

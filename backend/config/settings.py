@@ -36,11 +36,17 @@ INSTALLED_APPS = [
     #THIRD PARTY 
     'rest_framework',
     'corsheaders',
-    #CREATED
+    # Apps del SGIC
+    'apps.ganaderia',
+    'apps.compra_animales',
     'apps.inventario',
-    'apps.animales',
-    'apps.lotes',
-    'apps.compras',
+    'apps.compra_insumos',
+    'apps.alimentacion',
+    'apps.consumos',
+    'apps.sanidad',
+    'apps.gastos',
+    'apps.ventas',
+    'apps.auditoria',
 ]
 
 MIDDLEWARE = [

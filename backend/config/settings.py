@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     #THIRD PARTY 
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
     # Apps del SGIC
     'apps.ganaderia',
     'apps.compra_animales',
@@ -138,3 +139,15 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SGIC-Terneros API',
+    'DESCRIPTION': 'Sistema de Gestión Integral para la producción de terneros',
+    'VERSION': '1.5.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}

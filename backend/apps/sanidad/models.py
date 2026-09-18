@@ -8,6 +8,7 @@ class Tratamiento(models.Model):
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
     fecha = models.DateField()
     cantidad = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    costo_total = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     motivo = models.CharField(max_length=200)
     observaciones = models.TextField(blank=True, null=True)
 

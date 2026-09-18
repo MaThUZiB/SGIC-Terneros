@@ -27,8 +27,9 @@ class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='detalles')
     lote = models.ForeignKey(Lote, on_delete=models.PROTECT, related_name='ventas_detalle')
     cantidad_animales = models.IntegerField()
-    costo_reconocido = models.DecimalField(max_digits=12, decimal_places=2)
-    utilidad = models.DecimalField(max_digits=12, decimal_places=2)
+    ingreso = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    costo_reconocido = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    utilidad = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
         db_table = 'detalle_venta'

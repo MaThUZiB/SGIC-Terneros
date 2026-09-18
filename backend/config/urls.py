@@ -1,20 +1,25 @@
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from config.auth_views import MeView
 
 urlpatterns = [
-    #Pagina de ADMINISTRACIÓN
+    # Administración
     path('admin/', admin.site.urls),
-    #Esquema OpenAPI y Documentación
+    # Esquema OpenAPI y documentación
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    #Swagger UI
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    #Redoc (Documentación Alternativa)
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # Autenticación (JWT)
+    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/me/', MeView.as_view(), name='auth-me'),
 
     # API endpoints
     path('api/ganaderia/', include('apps.ganaderia.urls')),
@@ -27,4 +32,5 @@ urlpatterns = [
     path('api/gastos/', include('apps.gastos.urls')),
     path('api/ventas/', include('apps.ventas.urls')),
     path('api/auditoria/', include('apps.auditoria.urls')),
+    path('api/dashboard/', include('apps.dashboard.urls')),
 ]

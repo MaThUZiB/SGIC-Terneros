@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, extraerError } from '../api/client'
 import type { CostoLote } from '../api/types'
-import { Boton, Card, MensajeError, Modal, Spinner, Tabla, Badge } from '../components/ui'
+import { Boton, Card, MensajeError, Modal, PageHeader, Spinner, Tabla, Badge } from '../components/ui'
 import { fecha, moneda, numero, hoy } from '../utils/format'
 
 interface AnimalLote {
@@ -98,20 +98,22 @@ export function LoteDetallePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <button className="text-sm text-emerald-700 hover:underline" onClick={() => navigate('/lotes')}>
+      <div>
+          <button className="mb-2 text-sm font-medium text-emerald-700 hover:underline" onClick={() => navigate('/lotes')}>
             ← Volver a lotes
           </button>
-          <h1 className="text-xl font-semibold text-slate-800">Lote {costo.lote_codigo}</h1>
+          <PageHeader
+            titulo={`Lote ${costo.lote_codigo}`}
+            acciones={
+              <div className="flex items-center gap-3">
+                <Badge color={costo.estado === 'ACTIVO' ? 'green' : 'slate'}>{costo.estado}</Badge>
+                {costo.estado === 'ACTIVO' && (
+                  <Boton onClick={() => setDividirAbierto(true)}>Dividir lote</Boton>
+                )}
+              </div>
+            }
+          />
         </div>
-        <div className="flex items-center gap-3">
-          <Badge color={costo.estado === 'ACTIVO' ? 'green' : 'slate'}>{costo.estado}</Badge>
-          {costo.estado === 'ACTIVO' && (
-            <Boton onClick={() => setDividirAbierto(true)}>Dividir lote</Boton>
-          )}
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Tarjeta label="Animales (activos)" valor={`${costo.animales_activos} / ${costo.animales_considerados}`} />
@@ -169,7 +171,7 @@ export function LoteDetallePage() {
           <label className="block">
             <span className="text-sm font-medium text-slate-600">Código del nuevo lote *</span>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               value={nuevoCodigo}
               onChange={(e) => setNuevoCodigo(e.target.value)}
             />
@@ -178,7 +180,7 @@ export function LoteDetallePage() {
             <span className="text-sm font-medium text-slate-600">Fecha</span>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               value={fechaDivision}
               onChange={(e) => setFechaDivision(e.target.value)}
             />
@@ -187,7 +189,7 @@ export function LoteDetallePage() {
             <span className="text-sm font-medium text-slate-600">
               Animales a mover ({seleccion.length} seleccionados)
             </span>
-            <div className="mt-2 max-h-56 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+            <div className="mt-2 max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
               {animalesActivos.map((a) => (
                 <label key={a.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50">
                   <input

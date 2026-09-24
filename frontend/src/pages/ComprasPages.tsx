@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, extraerError } from '../api/client'
 import { CrudPage } from '../components/CrudPage'
-import { Boton, Card, MensajeError, Modal, Spinner, Tabla, Badge } from '../components/ui'
+import { Boton, Card, MensajeError, Modal, PageHeader, Spinner, Tabla, Badge } from '../components/ui'
 import { fecha, moneda, numero } from '../utils/format'
 
 interface Opcion {
@@ -184,10 +184,11 @@ export function ComprasInsumosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-800">Compras de insumos</h1>
-        <Boton onClick={() => setAbierto(true)}>+ Nueva compra</Boton>
-      </div>
+      <PageHeader
+        titulo="Compras de insumos"
+        descripcion="Registradas de mercancías e insumos"
+        acciones={<Boton onClick={() => setAbierto(true)}>+ Nueva compra</Boton>}
+      />
 
       {error && <MensajeError mensaje={error} />}
       <Card>
@@ -236,7 +237,7 @@ export function ComprasInsumosPage() {
             <label className="block">
               <span className="text-sm font-medium text-slate-600">Proveedor *</span>
               <select
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.proveedor}
                 onChange={(e) => setForm({ ...form, proveedor: e.target.value })}
               >
@@ -252,7 +253,7 @@ export function ComprasInsumosPage() {
               <span className="text-sm font-medium text-slate-600">Fecha *</span>
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.fecha}
                 onChange={(e) => setForm({ ...form, fecha: e.target.value })}
               />
@@ -260,7 +261,7 @@ export function ComprasInsumosPage() {
             <label className="block">
               <span className="text-sm font-medium text-slate-600">N° documento</span>
               <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.numero_documento}
                 onChange={(e) => setForm({ ...form, numero_documento: e.target.value })}
               />
@@ -276,9 +277,9 @@ export function ComprasInsumosPage() {
             </div>
             <div className="space-y-2">
               {filas.map((fila, i) => (
-                <div key={i} className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-12">
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-12">
                   <select
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-4"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none sm:col-span-4"
                     value={fila.producto}
                     onChange={(e) => actualizarFila(i, 'producto', e.target.value)}
                   >
@@ -290,7 +291,7 @@ export function ComprasInsumosPage() {
                     ))}
                   </select>
                   <select
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-3"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none sm:col-span-3"
                     value={fila.presentacion}
                     onChange={(e) => actualizarFila(i, 'presentacion', e.target.value)}
                     disabled={!fila.producto}
@@ -306,7 +307,7 @@ export function ComprasInsumosPage() {
                     type="number"
                     step="0.001"
                     placeholder="Cantidad"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none sm:col-span-2"
                     value={fila.cantidad}
                     onChange={(e) => actualizarFila(i, 'cantidad', e.target.value)}
                   />
@@ -314,7 +315,7 @@ export function ComprasInsumosPage() {
                     type="number"
                     step="0.01"
                     placeholder="Precio unit."
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none sm:col-span-2"
                     value={fila.precio_unitario}
                     onChange={(e) => actualizarFila(i, 'precio_unitario', e.target.value)}
                   />
@@ -337,7 +338,7 @@ export function ComprasInsumosPage() {
             <span className="text-sm font-medium text-slate-600">Observaciones</span>
             <textarea
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               value={form.observaciones}
               onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
             />
@@ -433,6 +434,8 @@ export function ComprasAnimalesPage() {
     lote: '',
   })
   const [animales, setAnimales] = useState<FilaAnimal[]>([{ ...FILA_ANIMAL_VACIA }])
+  const [recordSel, setRecordSel] = useState<any | null>(null)
+
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -501,10 +504,11 @@ export function ComprasAnimalesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-800">Compras de animales</h1>
-        <Boton onClick={() => setAbierto(true)}>+ Nueva compra</Boton>
-      </div>
+      <PageHeader
+        titulo="Compras de animales"
+        descripcion="Adquisición de ganado y creación de lotes"
+        acciones={<Boton onClick={() => setAbierto(true)}>+ Nueva compra</Boton>}
+      />
 
       {error && <MensajeError mensaje={error} />}
       <Card>
@@ -516,13 +520,88 @@ export function ComprasAnimalesPage() {
               { key: 'id', label: '#' },
               { key: 'fecha', label: 'Fecha', render: (c) => fecha(c.fecha) },
               { key: 'proveedor_nombre', label: 'Proveedor', render: (c) => c.proveedor_nombre ?? '—' },
-              { key: 'detalles', label: 'Animales', render: (c) => numero(c.detalles?.length ?? 0, 0) },
-              { key: 'total', label: 'Total', render: (c) => moneda(c.total) },
+              { key: 'detalles', label: 'Animales', render: (c) => numero(c.detalles?.length ?? 0, 0), ocultaEnMovil: true },
+              { key: 'total', label: 'Total', render: (c) => moneda(c.total), ocultaEnMovil: true },
             ]}
             datos={datos}
+            acciones={(c) => (
+              <Boton variante="secundario" onClick={() => setRecordSel(c)}>
+                Ver
+              </Boton>
+            )}
           />
         )}
       </Card>
+
+      <Modal abierto={!!recordSel} titulo={`Compra #${recordSel?.id ?? ''}`} onClose={() => setRecordSel(null)}>
+        {recordSel && (
+          <div className="space-y-4">
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase text-slate-400">Fecha</dt>
+                <dd className="font-medium text-slate-700">{fecha(recordSel.fecha)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-slate-400">Proveedor</dt>
+                <dd className="font-medium text-slate-700">{recordSel.proveedor_nombre ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-slate-400">Total</dt>
+                <dd className="font-medium text-emerald-600">{moneda(recordSel.total)}</dd>
+              </div>
+              {recordSel.observaciones && (
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium uppercase text-slate-400">Observaciones</dt>
+                  <dd className="text-slate-700">{recordSel.observaciones}</dd>
+                </div>
+              )}
+            </dl>
+            {recordSel.detalles && recordSel.detalles.length > 0 && (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Animales ({recordSel.detalles.length})
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-400">
+                      <tr>
+                        <th className="px-3 py-2">DIIO</th>
+                        <th className="px-3 py-2">Raza</th>
+                        <th className="px-3 py-2">Sexo</th>
+                        <th className="px-3 py-2 text-right">Precio</th>
+                        <th className="hidden px-3 py-2 sm:table-cell">Peso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(recordSel.detalles as any[]).map((d, i) => {
+                        const an = d.animal_detail ?? {}
+                        return (
+                          <tr key={i}>
+                            <td className="px-3 py-2 font-medium text-slate-700">{an.diio ?? d.animal}</td>
+                            <td className="px-3 py-2 text-slate-600">{an.raza_nombre ?? '—'}</td>
+                            <td className="px-3 py-2 text-slate-600">
+                              {an.sexo === 'M' ? 'Macho' : an.sexo === 'H' ? 'Hembra' : an.sexo ?? '—'}
+                            </td>
+                            <td className="px-3 py-2 text-right text-slate-700">{moneda(d.precio_adquisicion)}</td>
+                            <td className="hidden px-3 py-2 text-slate-600 sm:table-cell">
+                              {an.peso_ingreso_kg ? `${numero(an.peso_ingreso_kg)} kg` : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Boton variante="secundario" onClick={() => setRecordSel(null)}>
+                Cerrar
+              </Boton>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal abierto={abierto} titulo="Nueva compra de animales" onClose={() => setAbierto(false)} ancho="max-w-5xl">
         <div className="space-y-4">
@@ -532,7 +611,7 @@ export function ComprasAnimalesPage() {
               <span className="text-sm font-medium text-slate-600">Fecha compra *</span>
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.fecha}
                 onChange={(e) => setForm({ ...form, fecha: e.target.value })}
               />
@@ -540,7 +619,7 @@ export function ComprasAnimalesPage() {
             <label className="block">
               <span className="text-sm font-medium text-slate-600">Proveedor</span>
               <select
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.proveedor}
                 onChange={(e) => setForm({ ...form, proveedor: e.target.value })}
               >
@@ -554,7 +633,7 @@ export function ComprasAnimalesPage() {
             </label>
           </div>
 
-          <div className="rounded-md border border-slate-200 p-3">
+          <div className="rounded-lg border border-slate-200 p-3">
             <div className="mb-2 flex gap-2">
               <button
                 className={`rounded-md px-3 py-1 text-sm ${modo === 'nuevo' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}
@@ -574,7 +653,7 @@ export function ComprasAnimalesPage() {
                 <label className="block">
                   <span className="text-sm font-medium text-slate-600">Código de lote *</span>
                   <input
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     value={form.codigo}
                     onChange={(e) => setForm({ ...form, codigo: e.target.value })}
                   />
@@ -583,7 +662,7 @@ export function ComprasAnimalesPage() {
                   <span className="text-sm font-medium text-slate-600">Fecha ingreso</span>
                   <input
                     type="date"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     value={form.fecha_ingreso}
                     onChange={(e) => setForm({ ...form, fecha_ingreso: e.target.value })}
                   />
@@ -593,7 +672,7 @@ export function ComprasAnimalesPage() {
               <label className="block">
                 <span className="text-sm font-medium text-slate-600">Lote *</span>
                 <select
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   value={form.lote}
                   onChange={(e) => setForm({ ...form, lote: e.target.value })}
                 >
@@ -617,15 +696,15 @@ export function ComprasAnimalesPage() {
             </div>
             <div className="space-y-2">
               {animales.map((fila, i) => (
-                <div key={i} className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 lg:grid-cols-12">
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-3 lg:grid-cols-12">
                   <input
                     placeholder="DIIO *"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-2"
                     value={fila.diio}
                     onChange={(e) => actualizarAnimal(i, 'diio', e.target.value)}
                   />
                   <select
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-2"
                     value={fila.raza}
                     onChange={(e) => actualizarAnimal(i, 'raza', e.target.value)}
                   >
@@ -637,7 +716,7 @@ export function ComprasAnimalesPage() {
                     ))}
                   </select>
                   <select
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-1"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-1"
                     value={fila.sexo}
                     onChange={(e) => actualizarAnimal(i, 'sexo', e.target.value)}
                   >
@@ -646,14 +725,14 @@ export function ComprasAnimalesPage() {
                   </select>
                   <input
                     type="date"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-2"
                     value={fila.fecha_nacimiento}
                     onChange={(e) => actualizarAnimal(i, 'fecha_nacimiento', e.target.value)}
                   />
                   <input
                     type="number"
                     placeholder="Edad días"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-1"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-1"
                     value={fila.edad_aproximada_dias}
                     onChange={(e) => actualizarAnimal(i, 'edad_aproximada_dias', e.target.value)}
                   />
@@ -661,7 +740,7 @@ export function ComprasAnimalesPage() {
                     type="number"
                     step="0.01"
                     placeholder="Precio *"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-2"
                     value={fila.precio_adquisicion}
                     onChange={(e) => actualizarAnimal(i, 'precio_adquisicion', e.target.value)}
                   />
@@ -669,7 +748,7 @@ export function ComprasAnimalesPage() {
                     type="number"
                     step="0.01"
                     placeholder="Peso kg"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm lg:col-span-1"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none lg:col-span-1"
                     value={fila.peso_ingreso_kg}
                     onChange={(e) => actualizarAnimal(i, 'peso_ingreso_kg', e.target.value)}
                   />
@@ -692,7 +771,7 @@ export function ComprasAnimalesPage() {
             <span className="text-sm font-medium text-slate-600">Observaciones</span>
             <textarea
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               value={form.observaciones}
               onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
             />

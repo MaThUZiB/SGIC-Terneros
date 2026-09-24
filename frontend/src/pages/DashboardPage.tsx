@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, extraerError } from '../api/client'
 import type { ResumenDashboard } from '../api/types'
-import { Card, MensajeError, Spinner } from '../components/ui'
+import { Card, MensajeError, PageHeader, Spinner } from '../components/ui'
 import { moneda, numero } from '../utils/format'
 
 export function DashboardPage() {
@@ -38,7 +38,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold text-slate-800">Dashboard</h1>
+      <PageHeader titulo="Dashboard" descripcion="Resumen general de la operación" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tarjetas.map((t) => (

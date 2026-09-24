@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, extraerError } from '../api/client'
-import { Boton, Card, MensajeError, Modal, Spinner, Tabla, Badge } from '../components/ui'
+import { Boton, Card, MensajeError, Modal, PageHeader, Spinner, Tabla, Badge } from '../components/ui'
 import { fecha, moneda, numero } from '../utils/format'
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -114,10 +114,11 @@ export function VentasPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-800">Ventas</h1>
-        <Boton onClick={() => setAbierto(true)}>+ Nueva venta</Boton>
-      </div>
+      <PageHeader
+        titulo="Ventas"
+        descripcion="Comercialización de animales y utilidades"
+        acciones={<Boton onClick={() => setAbierto(true)}>+ Nueva venta</Boton>}
+      />
 
       {error && <MensajeError mensaje={error} />}
       <Card>
@@ -168,7 +169,7 @@ export function VentasPage() {
               <span className="text-sm font-medium text-slate-600">Fecha *</span>
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.fecha}
                 onChange={(e) => setForm({ ...form, fecha: e.target.value })}
               />
@@ -176,7 +177,7 @@ export function VentasPage() {
             <label className="block">
               <span className="text-sm font-medium text-slate-600">Comprador</span>
               <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.comprador}
                 onChange={(e) => setForm({ ...form, comprador: e.target.value })}
               />
@@ -186,7 +187,7 @@ export function VentasPage() {
               <input
                 type="number"
                 step="0.01"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.peso_total_kg}
                 onChange={(e) => setForm({ ...form, peso_total_kg: e.target.value })}
               />
@@ -196,7 +197,7 @@ export function VentasPage() {
               <input
                 type="number"
                 step="0.01"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.precio_kg}
                 onChange={(e) => setForm({ ...form, precio_kg: e.target.value })}
               />
@@ -208,7 +209,7 @@ export function VentasPage() {
               <input
                 type="number"
                 step="0.01"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 value={form.total_venta}
                 onChange={(e) => setForm({ ...form, total_venta: e.target.value })}
               />
@@ -230,7 +231,7 @@ export function VentasPage() {
               {filas.map((fila, i) => (
                 <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-10">
                   <select
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-7"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none sm:col-span-7"
                     value={fila.lote}
                     onChange={(e) =>
                       setFilas((f) => f.map((x, idx) => (idx === i ? { ...x, lote: e.target.value } : x)))
@@ -247,7 +248,7 @@ export function VentasPage() {
                     type="number"
                     min="1"
                     placeholder="Animales"
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm sm:col-span-2"
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-emerald-500 focus:outline-none sm:col-span-2"
                     value={fila.cantidad_animales}
                     onChange={(e) =>
                       setFilas((f) => f.map((x, idx) => (idx === i ? { ...x, cantidad_animales: e.target.value } : x)))
@@ -269,7 +270,7 @@ export function VentasPage() {
             <span className="text-sm font-medium text-slate-600">Observaciones</span>
             <textarea
               rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               value={form.observaciones}
               onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
             />

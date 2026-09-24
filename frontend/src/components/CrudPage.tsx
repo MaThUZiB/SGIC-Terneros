@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, extraerError } from '../api/client'
-import { Boton, Card, MensajeError, Modal, Spinner, Tabla, type Columna } from './ui'
+import { Boton, Card, Campo, inputCls, MensajeError, Modal, PageHeader, Spinner, Tabla, type Columna } from './ui'
 
 export interface Opcion {
   value: number | string
@@ -31,6 +31,7 @@ export interface FiltroDef {
 
 interface CrudPageProps {
   titulo: string
+  description?: string
   endpoint: string
   columnas: Columna<any>[]
   campos: CampoDef[]
@@ -57,6 +58,7 @@ function valoresIniciales(campos: CampoDef[]): Valores {
 
 export function CrudPage({
   titulo,
+  description,
   endpoint,
   columnas,
   campos,
@@ -204,33 +206,36 @@ export function CrudPage({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-800">{titulo}</h1>
-        <div className="flex flex-wrap items-end gap-3">
-          {filtros.map((f) => (
-            <label key={f.param} className="flex flex-col text-xs text-slate-500">
-              {f.label}
-              <select
-                className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
-                value={filtrosActivos[f.param] ?? ''}
-                onChange={(e) => {
-                  setPagina(1)
-                  setFiltrosActivos((prev) => ({ ...prev, [f.param]: e.target.value }))
-                }}
-              >
-                <option value="">Todos</option>
-                {f.opciones.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          {puedeCrear && <Boton onClick={abrirCrear}>+ {etiquetaCrear}</Boton>}
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        titulo={titulo}
+        descripcion={description}
+        acciones={
+          <>
+            {filtros.map((f) => (
+              <div key={f.param} className="flex flex-col text-xs text-slate-500">
+                <span className="font-medium">{f.label}</span>
+                <select
+                  className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  value={filtrosActivos[f.param] ?? ''}
+                  onChange={(e) => {
+                    setPagina(1)
+                    setFiltrosActivos((prev) => ({ ...prev, [f.param]: e.target.value }))
+                  }}
+                >
+                  <option value="">Todos</option>
+                  {f.opciones.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            {puedeCrear && <Boton onClick={abrirCrear}>+ {etiquetaCrear}</Boton>}
+          </>
+        }
+      />
 
       {error && <MensajeError mensaje={error} />}
 
@@ -289,18 +294,20 @@ export function CrudPage({
             {campos
               .filter((c) => !(editando && c.ocultoEnEdicion))
               .map((c) => (
-                <label key={c.name} className={c.type === 'textarea' ? 'sm:col-span-2' : ''}>
-                  <span className="text-sm font-medium text-slate-600">
-                    {c.label} {c.required && <span className="text-red-500">*</span>}
-                  </span>
+                <Campo
+                  key={c.name}
+                  label={c.label}
+                  requerido={c.required}
+                  ayuda={c.ayuda}
+                  className={c.type === 'textarea' ? 'sm:col-span-2' : ''}
+                >
                   <CampoInput
                     campo={c}
                     valor={valores[c.name]}
                     opciones={opcionesPorCampo[c.name] ?? c.opciones ?? []}
                     onChange={(v) => setValores((prev) => ({ ...prev, [c.name]: v }))}
                   />
-                  {c.ayuda && <span className="mt-1 block text-xs text-slate-400">{c.ayuda}</span>}
-                </label>
+                </Campo>
               ))}
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -328,10 +335,14 @@ function CampoInput({
   opciones: Opcion[]
   onChange: (v: unknown) => void
 }) {
-  const base = 'mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700'
+  const base = inputCls
   if (campo.type === 'select') {
     return (
-      <select className={base} value={String(valor ?? '')} onChange={(e) => onChange(e.target.value)}>
+      <select
+        className={`${base} appearance-none pr-8 bg-no-repeat bg-[right_0.5rem_center] bg-[length:1.1em_1.1em] bg-[url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")]`}
+        value={String(valor ?? '')}
+        onChange={(e) => onChange(e.target.value)}
+      >
         <option value="">— Seleccionar —</option>
         {opciones.map((o) => (
           <option key={o.value} value={o.value}>
@@ -345,7 +356,7 @@ function CampoInput({
     return (
       <input
         type="checkbox"
-        className="mt-2 h-4 w-4 rounded border-slate-300"
+        className="mt-2 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
         checked={Boolean(valor)}
         onChange={(e) => onChange(e.target.checked)}
       />

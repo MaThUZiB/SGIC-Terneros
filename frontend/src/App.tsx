@@ -3,10 +3,12 @@ import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { AnimalesPage, LotesPage, RazasPage } from './pages/GanaderiaPages'
+import { AnimalesPage, LotesPage, PesajesPage, RazasPage } from './pages/GanaderiaPages'
 import {
   CategoriasProductosPage,
+  ConversionesPage,
   MovimientosPage,
+  PresentacionesPage,
   ProductosPage,
   UnidadesMedidaPage,
 } from './pages/InventarioPages'
@@ -37,8 +39,11 @@ export function App() {
         <Route path="/lotes" element={<LotesPage />} />
         <Route path="/lotes/:id" element={<LoteDetallePage />} />
         <Route path="/razas" element={<RazasPage />} />
+        <Route path="/pesajes" element={<PesajesPage />} />
 
         <Route path="/productos" element={<ProductosPage />} />
+        <Route path="/presentaciones" element={<PresentacionesPage />} />
+        <Route path="/conversiones" element={<ConversionesPage />} />
         <Route path="/movimientos" element={<MovimientosPage />} />
         <Route path="/categorias-productos" element={<CategoriasProductosPage />} />
         <Route path="/unidades-medida" element={<UnidadesMedidaPage />} />

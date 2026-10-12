@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../api/supabase'
 
-type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null }
+type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number }
 type Lists = Record<string, Opt[]>
 type Field = { key: string; label: string; source?: string; type?: string; optional?: boolean }
 type Spec = { title: string; role: 'ADMIN' | 'TODOS'; fields: Field[]; help: string }
@@ -13,7 +13,7 @@ const S: Record<string, Spec> = {
   peso: {title:'Registrar pesaje',role:'TODOS',help:'Registra la evolución de peso del animal.',fields:[F('animal_id','DIIO','animal'),F('peso','Peso (kg)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
   fallecimiento: {title:'Registrar fallecimiento',role:'ADMIN',help:'La baja del animal actualiza el conteo y conserva su trazabilidad.',fields:[F('animal_id','DIIO','animal'),F('motivo','Causa / observaciones')]},
   division: {title:'Dividir lote',role:'ADMIN',help:'Selecciona el lote y marca los DIIO que se trasladarán. Se impide dividir lotes con costos o ventas históricas.',fields:[F('lote_id','Lote de origen','lote'),F('codigo','Código lote derivado')]},
-  compraInsumo: {title:'Crear compra de insumos',role:'ADMIN',help:'Borrador: el precio es por unidad base del producto. No mueve inventario hasta su confirmación.',fields:[F('proveedor_id','Proveedor','proveedor'),F('producto_id','Producto','producto'),F('presentacion_id','Presentación opcional','presentacion_producto',undefined,true),F('cantidad','Cantidad (unidades base o presentaciones)',undefined,'number'),F('precio','Precio por unidad base',undefined,'number'),F('documento','Documento (opcional)',undefined,'text',true),F('fecha','Fecha',undefined,'date')]},
+  compraInsumo: {title:'Crear compra de insumos',role:'ADMIN',help:'El precio se introduce por saco/presentación cuando lo seleccionas, o por unidad base. Por defecto la compra actualiza stock y PMP. Puedes guardar un borrador.',fields:[F('proveedor_id','Proveedor','proveedor'),F('producto_id','Producto','producto'),F('presentacion_id','Presentación opcional','presentacion_producto',undefined,true),F('cantidad','Cantidad (unidades base o presentaciones)',undefined,'number'),F('precio','Precio unitario de compra',undefined,'number'),F('documento','Documento (opcional)',undefined,'text',true),F('fecha','Fecha',undefined,'date'),F('confirmar_ahora','Al registrar','modo_compra')]},
   confirmar: {title:'Confirmar compra / actualizar PMP',role:'ADMIN',help:'La operación genera el kardex y recalcula costo promedio ponderado. Rechaza borradores con totales inconsistentes.',fields:[F('compra_id','Compra pendiente','compra')]},
   anular: {title:'Anular compra borrador',role:'ADMIN',help:'Una compra confirmada no puede anularse.',fields:[F('compra_id','Compra pendiente','compra')]},
   ajuste: {title:'Ajuste de stock',role:'ADMIN',help:'Variación positiva o negativa, con motivo trazable y validación de existencias.',fields:[F('producto_id','Producto','producto'),F('delta','Variación (+/-)',undefined,'number'),F('motivo','Motivo')]},
@@ -30,7 +30,7 @@ const S: Record<string, Spec> = {
   presentacion:{title:'Presentación comercial',role:'ADMIN',help:'Equivalencia entre envase comercial y unidad base del producto.',fields:[F('producto_id','Producto','producto'),F('nombre','Nombre de presentación'),F('cantidad','Cantidad en unidad base',undefined,'number')]},
   conversion:{title:'Conversión de unidades',role:'ADMIN',help:'Solo se admiten conversiones dentro de la misma dimensión (masa o volumen).',fields:[F('producto_id','Producto','producto'),F('origen_id','Unidad origen','unidad_medida'),F('origen_cantidad','Cantidad origen',undefined,'number'),F('destino_id','Unidad destino','unidad_medida'),F('destino_cantidad','Cantidad destino',undefined,'number')]},
   productoEditar:{title:'Actualizar producto',role:'ADMIN',help:'Corrige nombre, stock mínimo o estado, sin alterar movimientos históricos.',fields:[F('producto_id','Producto','producto'),F('nombre','Nombre actualizado'),F('minimo','Stock mínimo',undefined,'number'),F('activo','Estado','estado_activo')]},
-  animalRectificar:{title:'Rectificación de animal',role:'ADMIN',help:'Rectifica el sexo con justificación y auditoría; DIIO y costo de compra permanecen inalterados.',fields:[F('animal_id','DIIO','animal'),F('sexo','Sexo','sexo'),F('motivo','Motivo de rectificación')]},
+  animalRectificar:{title:'Rectificación de animal',role:'ADMIN',help:'Selecciona un sexo válido y explica el motivo (mínimo cinco caracteres). No necesita fecha; DIIO y costo se conservan.',fields:[F('animal_id','DIIO','animal'),F('sexo','Sexo','sexo'),F('motivo','Motivo de rectificación')]},
   catalogo:{title:'Crear maestro / catálogo',role:'ADMIN',help:'Registra proveedores, razas, unidades, productos, categorías, lotes o planes.',fields:[F('tipo','Tipo','tipo'),F('nombre','Nombre / código')]},
 }
 const groups: Record<string, string[]> = {
@@ -46,9 +46,27 @@ const catalogs = [
   {id:'unidad_medida',nombre:'Unidad de medida'},{id:'producto',nombre:'Producto'},
   {id:'plan_consumo',nombre:'Plan de consumo'},{id:'lote',nombre:'Lote vacío'},
 ]
-const base: Record<string,string> = {fecha:new Date().toLocaleDateString('en-CA')}
+const fechaLocal=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+const base=():Record<string,string>=>({fecha:fechaLocal(),confirmar_ahora:'SI'})
 const n = (v: string) => Number(v)
 const optionalN = (v: string) => v ? Number(v) : null
+const money=(v:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:2}).format(v)
+const round2=(v:number)=>Math.round((v+Number.EPSILON)*100)/100
+function purchaseLine(v:Record<string,string>,lists:Lists):Record<string,unknown>|null {
+  if(!v.producto_id&&!v.cantidad&&!v.precio&&!v.presentacion_id)return null
+  const cantidad=Number(v.cantidad),precio=Number(v.precio)
+  if(!v.producto_id||!v.cantidad||!v.precio||!Number.isFinite(cantidad)||cantidad<=0||!Number.isFinite(precio)||precio<=0)
+    throw Error('Completa producto, cantidad positiva y precio válido.')
+  const pack=v.presentacion_id?(lists.presentacion_producto||[]).find(x=>String(x.id)===v.presentacion_id):undefined
+  if(v.presentacion_id&&(!pack||String(pack.producto_id)!==v.producto_id))throw Error('Presentación no válida para el producto.')
+  const factor=pack?Number(pack.cantidad_base):1
+  if(!Number.isFinite(factor)||factor<=0)throw Error('Factor de presentación inválido.')
+  const cantidadBase=Math.round(cantidad*factor*1000)/1000
+  const precioBase=round2(precio/factor)
+  if(cantidadBase<=0||precioBase<=0)throw Error('Cantidad o precio demasiado pequeño.')
+  return {producto_id:Number(v.producto_id),cantidad,presentacion_id:optionalN(v.presentacion_id),cantidad_base:cantidadBase,precio_unitario:precioBase}
+}
+const subtotal=(i:Record<string,unknown>)=>round2(Number(i.cantidad_base)*Number(i.precio_unitario))
 const boxClass='w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700'
 function label(o: Opt, source: string) {
   if(source==='animal') return o.diio || String(o.id)
@@ -58,7 +76,7 @@ function label(o: Opt, source: string) {
   if(source==='compra') return '#' + o.id + ' · ' + (o.numero_documento || 'Borrador') + ' · ' + String(o.total)
   return o.nombre || o.codigo || String(o.id)
 }
-async function callOperation(op: string, v: Record<string,string>, selected: number[], batchAnimals: Record<string,unknown>[], batchItems: Record<string,unknown>[]) {
+async function callOperation(op: string, v: Record<string,string>, selected: number[], batchAnimals: Record<string,unknown>[], batchItems: Record<string,unknown>[], lists:Lists) {
   if(!supabase) throw Error('Supabase no está configurado')
   let method = ''
   let params: Record<string,unknown> = {}
@@ -73,7 +91,7 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
       if(v.tipo==='producto'){extra.categoria_id=n(v.categoria_id);extra.unidad_base_id=n(v.unidad_base_id);extra.stock_minimo=n(v.stock_minimo||'0')}
       if(v.tipo==='unidad_medida'){extra.codigo=v.codigo;extra.tipo=v.tipo_unidad}
       if(v.tipo==='proveedor'){extra.rut=v.rut||null;extra.email=v.email||null}
-      if(v.tipo==='lote')extra.fecha_ingreso=v.fecha||base.fecha
+      if(v.tipo==='lote')extra.fecha_ingreso=v.fecha||fechaLocal()
       if(v.tipo==='plan_consumo')extra.descripcion=v.descripcion||null
       params={p_tipo:v.tipo,p_nombre:v.nombre,p_opciones:extra};break
     }
@@ -88,13 +106,15 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'peso':method='sgic_registrar_peso';params={p_animal_id:n(v.animal_id),p_peso:n(v.peso),p_fecha:v.fecha};break
     case 'fallecimiento':method='sgic_fallecimiento';params={p_animal_id:n(v.animal_id),p_motivo:v.motivo};break
     case 'division':method='sgic_dividir_lote';params={p_lote_id:n(v.lote_id),p_codigo:v.codigo,p_animales:selected};break
-    case 'compraInsumo':
-      method='sgic_crear_compra_insumo'
-      params={p_proveedor_id:n(v.proveedor_id),p_fecha:v.fecha,p_documento:v.documento||null,
-        p_detalles:[...batchItems,{producto_id:n(v.producto_id),cantidad:n(v.cantidad),
-          presentacion_id:optionalN(v.presentacion_id),
-          ...(v.presentacion_id?{}:{cantidad_base:n(v.cantidad)}),precio_unitario:n(v.precio)}]};break
-    case 'confirmar':method='sgic_confirmar_compra_insumo';params={p_compra_id:n(v.compra_id)};break
+    case 'compraInsumo':{
+      const actual=purchaseLine(v,lists)
+      const items=[...batchItems,...(actual?[actual]:[])]
+      if(!items.length)throw Error('Añade al menos un producto.')
+      method=v.confirmar_ahora==='NO'?'sgic_crear_compra_insumo':'sgic_comprar_insumo'
+      params={p_proveedor_id:n(v.proveedor_id),p_fecha:v.fecha,p_documento:v.documento||null,p_detalles:items}
+      break
+    }
+        case 'confirmar':method='sgic_confirmar_compra_insumo';params={p_compra_id:n(v.compra_id)};break
     case 'anular':method='sgic_anular_borrador_insumo';params={p_compra_id:n(v.compra_id)};break
     case 'ajuste':method='sgic_ajustar_stock';params={p_producto_id:n(v.producto_id),p_delta:n(v.delta),p_motivo:v.motivo};break
     case 'consumo':method='sgic_registrar_consumo';params={p_lote_id:n(v.lote_id),p_producto_id:n(v.producto_id),p_cantidad:n(v.cantidad),p_fecha:v.fecha};break
@@ -117,7 +137,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   const [group,setGroup]=useState(esAdmin?'Ganadería':'Producción')
   const [action,setAction]=useState(esAdmin?'compraAnimal':'consumo')
   const [lists,setLists]=useState<Lists>({})
-  const [values,setValues]=useState<Record<string,string>>({...base})
+  const [values,setValues]=useState<Record<string,string>>(base())
   const [selected,setSelected]=useState<number[]>([])
   const [batchAnimals,setBatchAnimals]=useState<Record<string,unknown>[]>([])
   const [batchItems,setBatchItems]=useState<Record<string,unknown>[]>([])
@@ -141,7 +161,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     setGroup(g)
     const next=groups[g].find(x=>esAdmin||S[x].role==='TODOS')
     if(next)setAction(next)
-    setValues({...base});setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')
+    setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')
   }
   const more:Field[]=action==='catalogo'?
     values.tipo==='producto'?[F('categoria_id','Categoría de producto','categoria_producto'),F('unidad_base_id','Unidad base','unidad_medida'),F('stock_minimo','Stock mínimo',undefined,'number',true)]:
@@ -152,6 +172,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   function options(source:string){
     if(source==='tipo')return catalogs
     if(source==='estado_activo')return [{id:'SI',nombre:'Activo'},{id:'NO',nombre:'Inactivo'}]
+    if(source==='modo_compra')return [{id:'SI',nombre:'Confirmar ahora: ingresar stock y actualizar PMP'},{id:'NO',nombre:'Guardar borrador: NO ingresa inventario'}]
     if(source==='sexo')return [{id:'MACHO',nombre:'Macho'},{id:'HEMBRA',nombre:'Hembra'}]
     const arr=lists[source]||[]
     if(source==='compra'||source==='venta')return arr.filter(o=>o.estado==='BORRADOR')
@@ -173,32 +194,51 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
       }])
       setValues(prev=>({...prev,diio:'',raza_id:'',sexo:'',edad:'',precio:'',peso:''}))
     }else if(action==='compraInsumo'){
-      if(!values.producto_id||!values.cantidad||!values.precio){
-        setError('Completa producto, cantidad y precio antes de agregar el detalle');return
-      }
-      setBatchItems(prev=>[...prev,{
-        producto_id:n(values.producto_id),cantidad:n(values.cantidad),
-        presentacion_id:optionalN(values.presentacion_id),
-        ...(values.presentacion_id?{}:{cantidad_base:n(values.cantidad)}),
-        precio_unitario:n(values.precio)
-      }])
-      setValues(prev=>({...prev,producto_id:'',presentacion_id:'',cantidad:'',precio:''}))
+      try {
+        const line=purchaseLine(values,lists)
+        if(!line)throw Error('Completa un producto.')
+        setBatchItems(prev=>[...prev,line])
+        setValues(prev=>({...prev,producto_id:'',presentacion_id:'',cantidad:'',precio:''}))
+      }catch(e){setError(e instanceof Error?e.message:'Línea inválida')}
     }
   }
   async function submit(e:FormEvent){
     e.preventDefault();if(busy)return
     if((action==='venta'||action==='borradorVenta'||action==='division')&&selected.length===0){setError('Seleccione al menos un DIIO activo');return}
-    if(['venta','confirmarVenta','fallecimiento','confirmar','ajuste'].includes(action)&&
+    if(action==='animalRectificar'&&(!values.animal_id||!['MACHO','HEMBRA'].includes(values.sexo)||(values.motivo||'').trim().length<5)){
+      setError('Selecciona un animal y su sexo correcto. Explica el motivo con al menos 5 caracteres.');return
+    }
+    if(action==='compraInsumo'){
+      try{
+        const current=purchaseLine(values,lists)
+        const items=[...batchItems,...(current?[current]:[])]
+        if(!items.length)throw Error('Agrega al menos un producto.')
+        const total=items.reduce((sum,item)=>sum+subtotal(item),0)
+        const text=values.confirmar_ahora==='NO'
+          ? `Guardar borrador por ${money(total)}. NO ingresará stock hasta confirmar el borrador. ¿Continuar?`
+          : `Comprar por ${money(total)}. Ingresará stock, movimiento y PMP inmediatamente. ¿Continuar?`
+        if(!window.confirm(text))return
+      }catch(e){setError(e instanceof Error?e.message:'Compra inválida');return}
+    }
+    if(action==='confirmar'){
+      const current=(lists.compra||[]).find(x=>String(x.id)===values.compra_id)
+      if(!current||!window.confirm(`Confirmar borrador #${current.id} por ${money(Number(current.total||0))}. Revisa el total; la acción actualizará el inventario y no podrá revertirse directamente. ¿Continuar?`))return
+    }else if(['venta','confirmarVenta','fallecimiento','ajuste'].includes(action)&&
       !window.confirm('Esta operación registrará cambios auditados. ¿Confirmas?'))return
     setBusy(true);setError('');setOk('')
     try{
-      const result=await callOperation(action,values,selected,batchAnimals,batchItems)
-      setOk('Operación registrada. Referencia: '+String(result??'confirmada'))
-      setValues({...base});setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
+      const result=await callOperation(action,values,selected,batchAnimals,batchItems,lists)
+      setOk(action==='compraInsumo' ? (values.confirmar_ahora==='NO' ? `Borrador #${result} guardado. No modifica inventario.` : `Compra #${result} confirmada. Stock, kardex y PMP actualizados.`) : 'Operación registrada. Referencia: '+String(result??'confirmada'))
+      setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
     }catch(e){
-      setError((e instanceof Error?e.message:'Error desconocido')+'. Comprueba el historial antes de repetir, por si ya se registró.')
+      setError((e instanceof Error?e.message:'Error desconocido') + (action==='animalRectificar'?'. Selecciona sexo y un motivo con al menos cinco caracteres.':'. Comprueba el historial antes de repetir, por si ya se registró.'))
     }finally{setBusy(false)}
   }
+  let preview:Record<string,unknown>|null=null
+  try{if(action==='compraInsumo')preview=purchaseLine(values,lists)}catch{/* la validación muestra el mensaje al enviar */}
+  const previewItems=action==='compraInsumo'?[...batchItems,...(preview?[preview]:[])]:[]
+  const previewTotal=previewItems.reduce((sum,item)=>sum+subtotal(item),0)
+  const precioPresentacion=action==='compraInsumo'&&Boolean(values.presentacion_id)
   const candidates=(lists.animal||[]).filter(o=>o.estado==='ACTIVO'&&(action!=='division'||String(o.lote_id)===values.lote_id))
   return <div className="space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -209,7 +249,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
       <aside className="space-y-2">
         <h2 className="pb-2 text-sm font-semibold uppercase tracking-wider text-slate-500">Acciones</h2>
         {groups[group].filter(k=>esAdmin||S[k].role==='TODOS').map(k=>
-          <button key={k} onClick={()=>{setAction(k);setValues({...base});setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')}}
+          <button key={k} onClick={()=>{setAction(k);setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')}}
             className={'w-full rounded-xl px-3 py-3 text-left text-sm font-medium '+(action===k?'bg-emerald-900 text-white':'text-slate-600 hover:bg-slate-50')}>{S[k].title}</button>)}
       </aside>
       <section className="space-y-4">
@@ -219,25 +259,34 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
         <form onSubmit={submit} className="space-y-4">
           {S[action].fields.concat(more).map(f=>
             <label key={f.key} className="block text-sm">
-              <span className="mb-1.5 block font-medium">{f.label}</span>
+              <span className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
+                ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
+                :f.label}</span>
               {f.source?
                 <select className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" disabled={loading||busy}
-                  required={!f.optional} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
+                  required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&f.key==='producto_id')} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
                   <option value="">Seleccionar {f.optional?'(opcional)':''}</option>
                   {options(f.source).map(o=><option key={o.id} value={o.id}>{label(o,f.source!)}</option>)}
                 </select>:
                 <input className="w-full rounded-xl border border-slate-300 px-3 py-2.5" type={f.type||'text'}
                   min={f.type==='number'&&f.key!=='delta'?'0':undefined} step={f.type==='number'?'any':undefined}
-                  disabled={busy} required={!f.optional} value={values[f.key]??(f.type==='date'?base.fecha:'')}
+                  disabled={busy} required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&['cantidad','precio'].includes(f.key))} minLength={action==='animalRectificar'&&f.key==='motivo'?5:undefined} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
                   onChange={e=>setValues({...values,[f.key]:e.target.value})}/>}
             </label>)}
+          {action==='compraInsumo'&&<div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+            <p className="font-semibold">Resumen de compra</p>
+            <p className="mt-1">{precioPresentacion?'El precio ingresado corresponde a cada saco o presentación.':'El precio corresponde a cada unidad base del producto.'}</p>
+            {preview&&<p className="mt-1">Cantidad base: {String(preview.cantidad_base)} · costo por unidad base: {money(Number(preview.precio_unitario))}.</p>}
+            <p className="mt-2 font-semibold">Importe total: {money(previewTotal)}</p>
+            <p className="mt-1 text-xs">Si confirmas ahora se actualizarán inventario y PMP. Si guardas borrador, sus existencias no cambian.</p>
+          </div>}
           {(action==='compraAnimal'||action==='compraInsumo')&&<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-sm font-semibold text-emerald-950">
               Detalles agregados: {action==='compraAnimal'?batchAnimals.length:batchItems.length}
             </p>
             {(action==='compraAnimal'?batchAnimals:batchItems).map((entry,i)=>
               <div key={i} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs">
-                <span>{String(entry.diio||entry.producto_id)} · {String(entry.precio_adquisicion||entry.precio_unitario||0)}</span>
+                <span>{String(entry.diio||entry.producto_id)} · {action==='compraInsumo'?`${String(entry.cantidad_base)} unidades base · ${money(subtotal(entry))}`:String(entry.precio_adquisicion||0)}</span>
                 <button type="button" onClick={()=>{
                   if(action==='compraAnimal')setBatchAnimals(prev=>prev.filter((_,j)=>i!==j))
                   else setBatchItems(prev=>prev.filter((_,j)=>i!==j))
@@ -247,7 +296,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
               className="mt-3 rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-white">
               + Agregar otro {action==='compraAnimal'?'ternero':'producto'}
             </button>
-            <p className="mt-2 text-xs text-emerald-900">Al registrar se incluye también el formulario actual. Todos los detalles se guardan en una sola transacción.</p>
+            <p className="mt-2 text-xs text-emerald-900">Se incluirá el formulario actual solo cuando contenga datos completos. Todos los detalles se registran en una transacción.</p>
           </div>}
           {(action==='venta'||action==='borradorVenta'||action==='division')&&<fieldset className="rounded-xl border border-slate-200 p-4">
             <legend className="px-2 text-sm font-semibold">Seleccionar animales ({selected.length})</legend>
@@ -260,7 +309,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
           </fieldset>}
           <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">Las operaciones producen cambios reales. Compras confirmadas, fallecimientos y ventas no admiten eliminación directa.</p>
           <button disabled={loading||busy} className="w-full rounded-xl bg-emerald-900 px-5 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-            {busy?'Registrando…':'Registrar operación'}
+            {busy?'Registrando…':action==='compraInsumo'?(values.confirmar_ahora==='NO'?'Guardar borrador':'Comprar y actualizar inventario'):'Registrar operación'}
           </button>
         </form>
       </section>

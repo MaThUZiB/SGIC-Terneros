@@ -1,6 +1,6 @@
 # Arquitectura objetivo y secuencia de migración
 
-**Estado (12/10/2026):** React/Vite publicado en Cloudflare Pages, Supabase Auth/PostgreSQL/RLS integrados y módulos centrales implementados con RPC SQL transaccionales. En operación DEMO; no apto aún para datos empresariales reales sin auditoría de seguridad, pruebas E2E y restauración.
+**Estado (12/10/2026):** producción preparada en el proyecto Supabase Free `mtecrgoyrfclnlctenss`, con 14 migraciones, 28 tablas y datos empresariales vacíos. El proyecto anterior `rsqdtslkndgtaejkaoju` es histórico y NO se ha utilizado como fuente de datos. Pendiente crear y activar usuario administrador para efectuar el primer inicio de sesión. [Guía de puesta en marcha](./PRODUCTION_SETUP.md).
 
 ## Componentes
 
@@ -28,7 +28,7 @@ flowchart TD
 2. Root directory: `frontend`.
 3. Build command: `npm ci && npm run build`.
 4. Build output directory: `dist`.
-5. Definir `VITE_AUTH_PROVIDER=supabase`, `VITE_SUPABASE_URL` y la clave pública `VITE_SUPABASE_PUBLISHABLE_KEY`. No configurar variables privilegiadas.
+5. La compilación de producción de `frontend/src/api/supabase.ts` se fija a la URL y `sb_publishable_` públicas del proyecto `mtecrgoyrfclnlctenss`; ignora las antiguas variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` que pudieran permanecer en Cloudflare. Si más adelante se rota la clave, actualizar este archivo en GitHub. Nunca publicar secretos ni service_role.
 6. El archivo `frontend/public/_redirects` cubre rutas de React Router en Cloudflare Pages.
 7. En modo Supabase, las pantallas operacionales utilizan RPC auditadas y lectura protegida. Las pantallas Django históricas continúan solo en modo de desarrollo Django local.
 

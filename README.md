@@ -1,4 +1,7 @@
 # SGIC-Terneros
+
+**Despliegue:** [sgic-terneros.pages.dev](https://sgic-terneros.pages.dev/) · **Supabase de producción:** `mtecrgoyrfclnlctenss` (base inicialmente vacía, sin datos de demostración). Consulta [puesta en marcha](docs/PRODUCTION_SETUP.md) para crear el primer usuario administrador. El frontend publicado utiliza únicamente el proyecto nuevo; el proyecto anterior no aporta datos.
+
 > **Sistema de Gestión y Control de Inventarios para Unidades de Crianza de Terneros**
 
 ---

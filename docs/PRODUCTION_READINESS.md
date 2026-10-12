@@ -1,4 +1,7 @@
-# Auditoría y criterios de puesta en marcha — SGIC-Terneros
+# Auditoría histórica del proyecto de pruebas — SGIC-Terneros
+
+> **Solo histórico:** este informe revisó la base de pruebas `rsqdtslkndgtaejkaoju`. Desde el 12/10/2026 existe un proyecto de producción **nuevo y vacío** `mtecrgoyrfclnlctenss`, cuyas migraciones se aplicaron sin copiar datos ni usuarios. Consultar [puesta en marcha de producción](./PRODUCTION_SETUP.md). Las cifras DEMO de este documento no describen el nuevo entorno.
+
 
 Fecha de revisión: 12 de octubre de 2026. Entorno revisado: `rsqdtslkndgtaejkaoju` (Supabase Free). Código del frontend: Cloudflare Pages conectado a `main`.
 

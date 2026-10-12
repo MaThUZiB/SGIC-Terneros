@@ -92,7 +92,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
     setError('')
   }
   function applyPastedPrices(){
-    const values=pastedPrices.replace(/\\r/g,'').split(/\\n/).map(v=>v.trim()).filter(Boolean)
+    const values=pastedPrices.replace(/\r/g,'').split(/\n/).map(v=>v.trim()).filter(Boolean)
     if(!values.length||values.length!==selected.length){
       setError('Pega exactamente un precio por cada DIIO seleccionado, en el mismo orden de la tabla.');return
     }
@@ -245,7 +245,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
         <summary className="cursor-pointer text-sm font-semibold text-slate-800">Pegar columna de precios desde Excel</summary>
         <p className="mt-2 text-xs text-slate-600">Copia una columna de importes numéricos sin separadores de miles. Los valores se asignan en orden a los DIIO seleccionados; deben coincidir las cantidades.</p>
         <textarea value={pastedPrices} onChange={e=>setPastedPrices(e.target.value)} rows={4}
-          aria-label="Columna de precios por DIIO" placeholder={'180000\\n195000\\n175000'}
+          aria-label="Columna de precios por DIIO" placeholder={'180000\n195000\n175000'}
           className="mt-2 w-full rounded-lg border border-slate-300 p-2 font-mono text-sm"/>
         <button type="button" onClick={applyPastedPrices} className="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Aplicar precios de columna</button>
       </details>

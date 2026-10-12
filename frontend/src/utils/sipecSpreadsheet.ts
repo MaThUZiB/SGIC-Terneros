@@ -62,15 +62,30 @@ function cells(row: Element): string[] {
   return result
 }
 
+/**
+ * SIPECweb entrega archivos .xls XML con dos irregularidades de origen:
+ *  1) una etiqueta '<xml version>' que no es una declaración XML válida;
+ *  2) xmlns:x="urn:schemas-    microsoft-com:office:excel" (espacios internos).
+ *
+ * Corregir únicamente esas firmas conocidas, sin alterar las celdas, DIIO ni
+ * otras declaraciones. Los demás XML malformados siguen siendo rechazados.
+ */
+export function normalizeSipecLegacyXml(source: string): string {
+  return source
+    .replace(/^\uFEFF?\s*<xml\s+version\s*>/i, '')
+    .replace(/(\bxmlns:x\s*=\s*)(["'])urn:schemas-\s+microsoft-com:office:excel\2/i,
+      '$1$2urn:schemas-microsoft-com:office:excel$2')
+    .trim()
+}
+
 export function parseSipecSpreadsheetXml(source: string): SipecReport {
   if (source.length > 10_000_000) throw new Error('El archivo es demasiado grande para una previsualización segura.')
   if (/<!DOCTYPE|<!ENTITY/i.test(source)) throw new Error('No se aceptan archivos con declaraciones DTD o entidades externas.')
 
-  // SIPECweb genera el prefijo no estándar <xml version>, previo al Workbook.
-  const normalized = source.replace(/^\uFEFF?\s*<xml\s+version\s*>/i, '').trim()
+  const normalized = normalizeSipecLegacyXml(source)
   const xml = new DOMParser().parseFromString(normalized, 'application/xml')
   if (xml.getElementsByTagName('parsererror').length || xml.getElementsByTagNameNS('*', 'parsererror').length) {
-    throw new Error('El archivo no es un XML de Excel válido. Exporta nuevamente desde SIPECweb.')
+    throw new Error('El archivo no se pudo interpretar como XML de Excel. Comprueba que corresponda a la exportación de animales de SIPECweb.')
   }
   if (xml.documentElement.localName !== 'Workbook' || xml.documentElement.namespaceURI !== NS) {
     throw new Error('Formato no admitido. Esta acción acepta los .xls XML (Excel 2003) exportados por SIPECweb, no archivos PDF ni Excel binario.')

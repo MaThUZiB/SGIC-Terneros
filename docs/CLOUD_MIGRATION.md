@@ -1,6 +1,6 @@
 # Arquitectura objetivo y secuencia de migración
 
-**Estado:** primera fase de preparación, no aplicación conectada a Supabase. La implementación existente sigue usando Django REST Framework. No desplegar como aplicación productiva hasta completar la migración.
+**Estado (12/10/2026):** esquema PostgreSQL y control de roles activos en un proyecto Supabase de desarrollo; frontend con autenticación Supabase opcional y portal de transición. Los módulos de negocio Django aún no han sido migrados. No publicar como aplicación de producción.
 
 ## Componentes
 
@@ -29,9 +29,9 @@ flowchart TD
 2. Root directory: `frontend`.
 3. Build command: `npm ci && npm run build`.
 4. Build output directory: `dist`.
-5. Definir solo variables públicas `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` una vez exista el proyecto Supabase.
+5. Definir `VITE_AUTH_PROVIDER=supabase`, `VITE_SUPABASE_URL` y la clave pública `VITE_SUPABASE_PUBLISHABLE_KEY`. No configurar variables privilegiadas.
 6. El archivo `frontend/public/_redirects` cubre rutas de React Router en Cloudflare Pages.
-7. No publicar todavía el frontend heredado con operaciones reales: sus llamadas siguen dirigidas a Django y no funcionarán sin él.
+7. En modo Supabase, únicamente el login y el portal de transición funcionan sin Django. Las páginas CRUD heredadas no se exponen en este modo. Para las operaciones antiguas debe usarse el modo Django local.
 
 ## Migración funcional por fases
 
@@ -52,3 +52,11 @@ flowchart TD
 - Pruebas de restauración documentadas antes de cargar datos empresariales reales.
 
 **Manual de arquitectura:** [Notion](https://app.notion.com/p/3f7b5e350d7181f5957df2b6c8b54634).
+
+## Identidades y permisos implementados
+
+- Trigger privado crea perfil de cada usuario Auth con rol `OPERADOR` e `activo=false`.
+- Un administrador habilita usuarios de forma controlada desde SQL Editor; ninguna clave secreta se publica en React.
+- Cambios de rol/estado generan auditoría y solo el perfil propio es visible por RLS.
+- React usa el SDK oficial de Supabase con versión bloqueada; ingreso con correo/contraseña, validación de sesión y perfil. Las rutas empresariales Django quedan excluidas del modo Supabase.
+- Ver [procedimiento operativo](../supabase/README.md) para alta de administrador e instrucciones de validación.

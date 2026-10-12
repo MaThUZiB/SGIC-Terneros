@@ -300,9 +300,10 @@ export function OperationalModules({
         <h2 className="text-xl font-semibold tracking-tight text-slate-900">{panelTitle}</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{S[action].help}</p>
       </div>
-      <button type="button" onClick={onClose} disabled={busy}
-        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-        Cerrar formulario
+      <button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar formulario" title="Cerrar formulario"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
     </div>
     {error&&<p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}

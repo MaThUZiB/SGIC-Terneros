@@ -22,13 +22,14 @@ const S: Record<string, Spec> = {
   gasto: {title:'Registrar gasto',role:'ADMIN',help:'Asocia gastos al lote o registra un gasto general.',fields:[F('categoria_id','Categoría','categoria_gasto'),F('lote_id','Lote (opcional)','lote',undefined,true),F('nombre','Concepto'),F('monto','Monto (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
   venta: {title:'Confirmar venta por DIIO',role:'ADMIN',help:'Selecciona los animales exactos y registra ingreso y costos reconocidos. No se puede deshacer una venta confirmada.',fields:[F('comprador','Comprador',undefined,'text',true),F('total','Monto de venta (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
   planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'La cantidad se expresa en la unidad base del producto.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria',undefined,'number')]},
+  consumoPlan:{title:'Ejecutar consumo desde plan',role:'TODOS',help:'Aplica el plan diario, descuenta stock y evita repetirlo en la misma fecha.',fields:[F('asignacion_id','Asignación vigente','asignacion_plan_lote'),F('fecha','Fecha',undefined,'date')]},
   asignarPlan:{title:'Asignar plan alimentario a lote',role:'ADMIN',help:'Asigna la alimentación planificada a un lote activo.',fields:[F('plan_id','Plan','plan_consumo'),F('lote_id','Lote','lote'),F('fecha','Fecha de inicio',undefined,'date')]},
   catalogo:{title:'Crear maestro / catálogo',role:'ADMIN',help:'Registra proveedores, razas, unidades, productos, categorías, lotes o planes.',fields:[F('tipo','Tipo','tipo'),F('nombre','Nombre / código')]},
 }
 const groups: Record<string, string[]> = {
   Ganadería:['compraAnimal','peso','fallecimiento','division'],
   Inventario:['compraInsumo','confirmar','anular','ajuste'],
-  Producción:['consumo','tratamiento','planDetalle','asignarPlan'],
+  Producción:['consumo','consumoPlan','tratamiento','planDetalle','asignarPlan'],
   Finanzas:['venta','gasto'],
   Catálogos:['catalogo'],
 }
@@ -45,6 +46,7 @@ const boxClass='w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 t
 function label(o: Opt, source: string) {
   if(source==='animal') return o.diio || String(o.id)
   if(source==='lote') return o.codigo || String(o.id)
+  if(source==='asignacion_plan_lote') return 'Asignación #' + o.id + ' · lote ' + String(o.lote_id)
   if(source==='compra') return '#' + o.id + ' · ' + (o.numero_documento || 'Borrador') + ' · ' + String(o.total)
   return o.nombre || o.codigo || String(o.id)
 }
@@ -87,6 +89,7 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'gasto':method='sgic_registrar_gasto';params={p_categoria_id:n(v.categoria_id),p_lote_id:optionalN(v.lote_id),p_nombre:v.nombre,p_monto:n(v.monto),p_fecha:v.fecha};break
     case 'venta':method='sgic_confirmar_venta';params={p_animal_ids:selected,p_total:n(v.total),p_comprador:v.comprador||'',p_fecha:v.fecha};break
     case 'planDetalle':method='sgic_plan_detalle';params={p_plan_id:n(v.plan_id),p_producto_id:n(v.producto_id),p_cantidad_diaria:n(v.cantidad)};break
+    case 'consumoPlan':method='sgic_consumo_desde_plan';params={p_asignacion_id:n(v.asignacion_id),p_fecha:v.fecha};break
     case 'asignarPlan':method='sgic_asignar_plan';params={p_plan_id:n(v.plan_id),p_lote_id:n(v.lote_id),p_inicio:v.fecha};break
     default:throw Error('Operación no soportada')
   }
@@ -107,7 +110,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   async function refresh(){
     if(!supabase)return
     setLoading(true)
-    const keys=['animal','lote','raza','proveedor','producto','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo']
+    const keys=['animal','lote','raza','proveedor','producto','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo','asignacion_plan_lote']
     const results=await Promise.all(keys.map(k=>supabase!.from(k).select('*').order('id',{ascending:true}).limit(1000)))
     const next:Lists={}
     results.forEach((r,i)=>{next[keys[i]==='compra_insumo'?'compra':keys[i]]=(r.data||[]) as Opt[]})
@@ -133,6 +136,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     if(source==='sexo')return [{id:'MACHO',nombre:'Macho'},{id:'HEMBRA',nombre:'Hembra'}]
     const arr=lists[source]||[]
     if(source==='compra')return arr.filter(o=>o.estado==='BORRADOR')
+    if(source==='asignacion_plan_lote')return arr.filter(o=>o.activo!==false)
     if(source==='lote'||source==='animal')return arr.filter(o=>o.estado==='ACTIVO')
     return arr.filter(o=>o.activo!==false)
   }

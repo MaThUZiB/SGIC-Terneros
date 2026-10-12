@@ -123,7 +123,7 @@ export function SipecSyncPreview({onClose,onChanged}:{onClose:()=>void;onChanged
           Compara sus DIIO con el registro de SGIC y revisa las diferencias.
         </p>
       </div>
-      <button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar sincronización" title="Cerrar"
+      <button type="button" onClick={onClose} disabled={busy||incorporando} aria-label="Cerrar sincronización" title="Cerrar"
         className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50">
         <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
@@ -138,7 +138,7 @@ export function SipecSyncPreview({onClose,onChanged}:{onClose:()=>void;onChanged
     <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
       <label htmlFor={inputId} className="mb-3 block text-sm font-semibold text-slate-800">Exportación de SIPECweb</label>
       <input id={inputId} type="file" accept=".xls,.xml,application/vnd.ms-excel,application/xml,text/xml"
-        onChange={event=>{void selectFile(event)}} disabled={busy}
+        onChange={event=>{void selectFile(event)}} disabled={busy||incorporando}
         className="block w-full max-w-lg text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-800 file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-emerald-900 disabled:opacity-50"/>
       <p className="mt-3 text-xs leading-5 text-slate-500">
         Acepta el .xls de SIPECweb (Excel XML 2003); no el PDF de «Imprimir animales presentes».
@@ -153,7 +153,7 @@ export function SipecSyncPreview({onClose,onChanged}:{onClose:()=>void;onChanged
     {report&&<div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="break-all text-sm text-slate-600"><strong>Archivo revisado:</strong> {filename} · {report.filasLeidas} filas examinadas</p>
-        <button type="button" onClick={reset} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Elegir otro archivo</button>
+        <button type="button" onClick={reset} disabled={incorporando} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Elegir otro archivo</button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

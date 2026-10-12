@@ -187,7 +187,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   function options(source:string){
     if(source==='tipo')return catalogs
     if(source==='estado_activo')return [{id:'SI',nombre:'Activo'},{id:'NO',nombre:'Inactivo'}]
-    if(source==='modo_compra')return [{id:'SI',nombre:'Confirmar ahora: ingresar stock y actualizar PMP'},{id:'NO',nombre:'Guardar borrador: NO ingresa inventario'}]
+    if(source==='modo_compra')return [{id:'SI',nombre:'Confirmar ahora: ingresar stock y actualizar PMP'},{id:'NO',nombre:'Enviar a Solicitudes pendientes: no ingresa inventario'}]
     if(source==='sexo')return [{id:'MACHO',nombre:'Macho'},{id:'HEMBRA',nombre:'Hembra'}]
     const arr=lists[source]||[]
     if(source==='compra'||source==='venta')return arr.filter(o=>o.estado==='BORRADOR')
@@ -270,7 +270,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     setBusy(true);setError('');setOk('')
     try{
       const result=await callOperation(action,values,selected,batchAnimals,batchItems,lists)
-      setOk(action==='compraInsumo' ? (values.confirmar_ahora==='NO' ? `Borrador #${result} guardado. No modifica inventario.` : `Compra #${result} confirmada. Stock, kardex y PMP actualizados.`) : 'Operación registrada. Referencia: '+String(result??'confirmada'))
+      setOk(action==='compraInsumo' ? (values.confirmar_ahora==='NO' ? `Solicitud #${result} enviada a Pendientes. No modifica inventario.` : `Compra #${result} confirmada. Stock, kardex y PMP actualizados.`) : 'Operación registrada. Referencia: '+String(result??'confirmada'))
       setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
     }catch(e){
       setError((e instanceof Error?e.message:'Error desconocido') + (action==='animalRectificar'?'. Selecciona sexo y un motivo con al menos cinco caracteres.':'. Comprueba el historial antes de repetir, por si ya se registró.'))
@@ -283,18 +283,23 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   const precioPresentacion=action==='compraInsumo'&&Boolean(values.presentacion_id)
   const candidates=(lists.animal||[]).filter(o=>o.estado==='ACTIVO'&&(action!=='division'||String(o.lote_id)===values.lote_id))
   return <div className="space-y-5">
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
+      <p className="px-2 pb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">01 · Área de trabajo</p>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
       {Object.keys(groups).filter(g=>esAdmin||['Ganadería','Producción'].includes(g)).map(g=>
-        <button key={g} onClick={()=>pick(g)} className={'rounded-2xl border p-4 text-left font-semibold '+(group===g?'border-emerald-700 bg-emerald-50 text-emerald-950':'border-slate-200 bg-white text-slate-700')}>{g}</button>)}
+        <button key={g} onClick={()=>pick(g)} className={'rounded-xl border px-4 py-3 text-left text-sm font-semibold '+(group===g?'border-emerald-300 bg-white text-emerald-950 shadow-sm':'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700')}>{g}</button>)}
+      </div>
     </div>
-    <div className="grid gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[240px_minmax(0,1fr)] sm:p-7">
-      <aside className="space-y-2">
-        <h2 className="pb-2 text-sm font-semibold uppercase tracking-wider text-slate-500">Acciones</h2>
+    <div className="grid min-h-[900px] gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[250px_minmax(0,1fr)] sm:p-7">
+      <aside aria-label="Acciones del área" className="rounded-xl border border-slate-200 bg-slate-50 p-3 lg:self-start">
+        <h2 className="mb-3 border-b border-slate-200 pb-3 text-xs font-semibold uppercase tracking-widest text-slate-600">02 · Acciones de {group}</h2>
+        <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col">
         {groups[group].filter(k=>esAdmin||S[k].role==='TODOS').map(k=>
-          <button key={k} onClick={()=>{setAction(k);setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')}}
-            className={'w-full rounded-xl px-3 py-3 text-left text-sm font-medium '+(action===k?'bg-emerald-900 text-white':'text-slate-600 hover:bg-slate-50')}>{S[k].title}</button>)}
+          <button key={k} onClick={()=>pickAction(k)}
+            className={'shrink-0 whitespace-nowrap rounded-xl border-l-4 px-3 py-3 text-left text-sm font-medium lg:w-full lg:whitespace-normal '+(action===k?'border-emerald-400 bg-emerald-900 text-white shadow-sm':'border-transparent bg-white text-slate-700 hover:bg-emerald-50')}>{S[k].title}</button>)}
+        </div>
       </aside>
-      <section className="space-y-4">
+      <section className="min-w-0 space-y-4">
         <div><h2 className="text-lg font-semibold">{S[action].title}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{S[action].help}</p></div>
         {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
         {ok&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{ok}</p>}
@@ -306,13 +311,13 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
                 :f.label}</span>
               {f.source?
                 <select className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" disabled={loading||busy}
-                  required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&f.key==='producto_id')} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
+                  required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&f.key==='producto_id') && !(action==='compraAnimal'&&batchAnimals.length>0&&['raza_id','sexo'].includes(f.key))} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
                   <option value="">Seleccionar {f.optional?'(opcional)':''}</option>
                   {options(f.source).map(o=><option key={o.id} value={o.id}>{label(o,f.source!)}</option>)}
                 </select>:
-                <input className="w-full rounded-xl border border-slate-300 px-3 py-2.5" type={f.type||'text'}
-                  min={f.type==='number'&&f.key!=='delta'?'0':undefined} step={f.type==='number'?'any':undefined}
-                  disabled={busy} required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&['cantidad','precio'].includes(f.key))} minLength={action==='animalRectificar'&&f.key==='motivo'?5:undefined} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
+                <input className="w-full rounded-xl border border-slate-300 px-3 py-2.5" type={f.type==='number'?'text':f.type||'text'} inputMode={f.type==='number'?'decimal':undefined}
+                  pattern={f.type==='number'?'-?[0-9]+([.,][0-9]+)?':undefined}
+                  disabled={busy} required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&['cantidad','precio'].includes(f.key)) && !(action==='compraAnimal'&&batchAnimals.length>0&&['diio','edad','precio'].includes(f.key))} minLength={action==='animalRectificar'&&f.key==='motivo'?5:undefined} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
                   onChange={e=>setValues({...values,[f.key]:e.target.value})}/>}
             </label>)}
           {action==='compraInsumo'&&<div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
@@ -356,6 +361,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
         </form>
       </section>
     </div>
+    <OperationConfirmDialog details={confirmDetails} busy={busy} onConfirm={()=>{void executeOperation()}} onCancel={()=>setConfirmDetails(null)}/>
   </div>
 }
 const views:Record<string,string[]> = {

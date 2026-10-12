@@ -1,74 +1,103 @@
-# SIPECweb — conciliación de animales por DIIO
+# SIPECweb — Conciliación e incorporación valorizada de animales
 
-## 1. Objetivo y alcance
+## 1. Alcance
 
-La función **Animales → Sincronizar con SIPECweb** permite revisar una exportación de animales del SAG y contrastar los DIIO del documento con los animales registrados en SGIC-Terneros.
+SGIC-Terneros utiliza archivos **XML Spreadsheet 2003 (.xls)** exportados desde la consulta de animales presentes en SIPECweb. La integración es **manual**: el administrador descarga el archivo oficial y lo selecciona desde **Animales → Sincronizar con SIPECweb**.
 
-**Implementado:** carga de archivo, validación del formato, detección de duplicados y previsualización de diferencias. **No implementado:** incorporación definitiva desde el archivo, modificación automática de estados ni consulta directa a servicios del SAG.
+El proceso se divide en dos acciones independientes:
 
-El archivo se procesa localmente en el navegador; no se sube ni se almacena en Supabase. La base solo recibe consultas de lectura de DIIO y estado de animales autorizadas por RLS.
+1. **Conciliación (solo lectura):** comparar DIIO oficiales contra los registros existentes sin efectuar cambios.
+2. **Incorporación supervisada:** seleccionar DIIO nuevos, elegir un tipo de ingreso, asignar lote, fecha, raza y valor económico individual, revisar y confirmar una única transacción.
 
-## 2. Exportación desde SIPECweb
+No se dispone de API oficial SAG conectada a SGICweb ni se efectúa scraping del portal. No se almacenan archivos ni contraseñas de SIPECweb en el servidor.
 
-1. Ingresar al portal SIPECweb con la cuenta SAG autorizada para el predio.
-2. Acceder a la consulta de animales y generar la exportación **Excel (.xls)** de animales presentes.
-3. Guardar el archivo sin modificar los DIIO y sin convertir a CSV/PDF.
-4. Volver a SGIC-Terneros e iniciar sesión con perfil `ADMIN`.
-5. Entrar a **Animales → Sincronizar con SIPECweb**.
-6. Elegir el archivo `.xls` o su equivalente `.xml` y esperar el procesamiento.
-7. Revisar los contadores y las tablas de DIIO nuevos, existentes y ausentes.
-8. Cerrar el formulario al terminar; no se confirman cambios empresariales.
+## 2. Exportar y comparar animales
 
-## 3. Formato admitido
+1. Acceder a SIPECweb con credenciales autorizadas.
+2. Abrir la consulta de animales presentes y descargar el archivo Excel XLS.
+3. Mantener el archivo original; no convertirlo a PDF, CSV ni XLSX.
+4. Ingresar a SGIC-Terneros con rol ADMIN.
+5. Seleccionar **Animales → Sincronizar con SIPECweb** y cargar el archivo.
+6. Revisar **DIIO nuevos**, **ya registrados** y **activos en SGIC ausentes de la exportación**.
+7. Revisar raza, sexo, categoría, fecha de nacimiento, establecimiento y observaciones.
+8. Si solo se necesita conciliar, cerrar la pantalla. Esta primera acción no modifica registros.
 
-**Contenedor:** XML Spreadsheet 2003 (texto XML con extensión `.xls`); no es un libro Excel binario ni `.xlsx`. El parser está en `frontend/src/utils/sipecSpreadsheet.ts`; la vista en `frontend/src/pages/SipecSyncPreview.tsx`.
+La comparación se basa en el conjunto de identificadores, no en restar el total de una exportación al de otra. Un DIIO ausente no constituye una venta, fallecimiento o traslado automático.
 
-Campos:
+## 3. Incorporación valorizada de DIIO nuevos
 
-| Columna SAG | Uso en SGIC |
+Una vez comprobados los resultados:
+
+1. Seleccionar **Incorporar DIIO nuevos con valorización**.
+2. Elegir el **tipo de ingreso**:
+   - **Compra:** genera compra de animales, detalle de compra y animales activos.
+   - **Existencia inicial:** registra animales con valor base; **no** genera compra.
+   - **Traslado:** utiliza el costo histórico transferido; **no** genera una compra nueva.
+   - **Nacimiento:** utiliza un costo base definido conforme al criterio de valorización del predio; **no** genera compra.
+3. Seleccionar un lote activo o introducir un código para crear uno nuevo.
+4. Revisar la fecha de incorporación y el documento de referencia opcional (FMA, folio o documento interno).
+5. Para una compra, seleccionar proveedor si se dispone de él.
+6. Homologar cada raza SAG con el catálogo de SGIC. Se puede escoger una raza existente o registrar la raza SAG como nueva dentro de la misma transacción.
+7. En la tabla editable, seleccionar los DIIO y completar su **valor base (CLP)** uno a uno. Es posible aplicar un valor común o pegar una columna de precios en el orden visible de la selección (sin separadores de miles).
+8. Revisar el número de animales, valor total, lote y tipo de ingreso.
+9. Pulsar **Revisar y confirmar incorporación** y aceptar el diálogo final.
+10. Comprobar el resultado en Animales y en el historial. Solo los DIIO seleccionados y confirmados pasan a formar parte de SGIC.
+
+**Reglas:** cada animal debe tener un valor económico positivo y una raza asignada. Se permiten hasta **200 DIIO por operación**. No se guarda un precio desconocido como cero ni se genera automáticamente una compra para tipos no comerciales. Si no se conoce aún el valor de un animal, su incorporación debe esperar a completar la valorización.
+
+La aplicación verifica DIIO previamente registrados antes de llamar a la función SQL. La base aplica también una restricción de unicidad de DIIO; un error cancela toda la transacción y no incorpora un subconjunto.
+
+## 4. Estructuras de datos y contabilidad
+
+La migración `20261012194500_sipec_ingreso_y_venta_valorizada.sql` incorpora:
+
+- `ingreso_sipec`: tipo, fecha, lote, proveedor cuando corresponda, referencia, cantidad, valor total, usuario responsable.
+- `ingreso_sipec_animal`: relación DIIO/ingreso, valor base y campos descriptivos originales del SAG.
+- La RPC `sgic_incorporar_desde_sipec`: ejecución transaccional autenticada exclusivamente para ADMIN.
+
+Por compatibilidad con el motor económico vigente, `animal.precio_adquisicion` conserva el **valor base de incorporación**, tanto para compras como para existencias iniciales, traslados y nacimientos. En ingresos no comerciales no debe interpretarse ese valor como un pago de compra; el tipo queda explicitado en `ingreso_sipec`.
+
+El registro inicial no crea un costo acumulado por alimentación o sanidad; esos costos se imputan mediante las operaciones normales de SGIC.
+
+## 5. Estructura del XLS del SAG
+
+| Campo SAG | Función |
 |---|---|
-| `NUMERO_DIIO` | Identificador individual, validado y almacenado temporalmente como **texto** |
-| `RAZA` | Dato descriptivo para futura homologación |
-| `SEXO` | Información asociada al animal |
-| `CATEGORIA` | Categoría pecuaria SAG, visible en la comparación |
-| `FECHA_NACIMIENTO` | Fecha normalizada cuando es válida |
-| `ESTABLECIMIENTO` | Referencia textual de la exportación; no se interpreta como RUP destino |
+| `NUMERO_DIIO` | Identificador único **como texto**, conservando ceros iniciales |
+| `RAZA` | Homologación o alta de raza en catálogo |
+| `SEXO` | Macho/Hembra |
+| `CATEGORIA` | Categoría SAG descriptiva |
+| `FECHA_NACIMIENTO` | Fecha de nacimiento, usada para cálculo de edad al ingresar |
+| `ESTABLECIMIENTO` | Texto informativo; no inferir RUP de destino |
 | `GLOSA_PABCO` | Dato descriptivo opcional |
-| `CANTIDAD` | Campo informativo de la exportación; **no** representa un alta múltiple por cada fila |
+| `CANTIDAD` | Campo informativo; no multiplicar el número de animales |
 
-El parser verifica la presencia de los encabezados esenciales, fechas, DIIO numéricos de 7 a 15 cifras y duplicados. Los DIIO conservan todos los ceros iniciales. Se limita la carga a 8 MB, 15.000 filas XML y la comparación contra un máximo de 25.000 registros SGIC; la tabla muestra hasta 100 filas por vista.
+El parser en `frontend/src/utils/sipecSpreadsheet.ts` admite el namespace anómalo de algunas exportaciones SAG, normalizando únicamente las firmas conocidas antes de interpretarlas. Se rechazan archivos XML incompatibles, DIIO inválidos y duplicados. El archivo está limitado a 8 MB y 15.000 filas; la comparación consulta hasta 25.000 animales de SGIC.
 
-**Compatibilidad SAG:** algunas exportaciones utilizan una etiqueta preliminar `<xml version>` y espacios internos en `xmlns:x`. El lector normaliza **solo esas firmas conocidas** antes de interpretar el XML, sin alterar valores de celdas. La regresión está cubierta por `frontend/tests/sipecSpreadsheet.test.mjs` y `npm run test:sipec`.
+## 6. Venta con precios individuales
 
-## 4. Criterio de conciliación
+En **Ventas → Venta con precios por DIIO**, un ADMIN puede seleccionar animales activos y asignar importes económicos individuales. La RPC `sgic_venta_precios_individuales` confirma la venta utilizando las mismas reglas de autorización y costo por lote, guarda precios por DIIO en `venta_precio_animal` y distribuye ingreso/utilidad de cada lote según los importes asignados.
 
-Sea `E` el conjunto de DIIO exportados en el archivo y `S` el conjunto registrado en SGIC:
+El formulario admite hasta 200 animales por venta. La venta estándar y los borradores existentes siguen disponibles. La venta individual se confirma directamente, sin crear borrador.
 
-- **DIIO nuevos:** `E − S`; presentes en el archivo y no registrados en SGIC.
-- **Ya registrados:** `E ∩ S`; aparecen en ambos sistemas.
-- **Ausentes de la exportación:** DIIO de `S` con estado ACTIVO no contenidos en `E`. **No** se marcan automáticamente como vendidos, trasladados o fallecidos.
+## 7. Límites y responsabilidades
 
-La comparación utiliza identificadores, **no** restas de cantidades totales. Una exportación posterior puede tener animales nuevos y otros ausentes simultáneamente.
+- Una exportación de existencias no acredita una compraventa ni el pago de un animal.
+- La fecha de nacimiento no sustituye la fecha del traslado, de compra o de recepción del FMA.
+- `ESTABLECIMIENTO` es el texto del archivo y no debe utilizarse como un RUP de destino verificado.
+- La recepción formal del movimiento debe realizarse en SIPECweb conforme a la normativa SAG; esta función no modifica los movimientos oficiales.
+- Los animales existentes en SGIC no se sobrescriben al importar otra exportación.
+- El archivo XLS solo se analiza en el navegador; la RPC recibe los datos seleccionados para registrarlos.
 
-## 5. Interpretación operativa y límites
+## 8. Verificación técnica
 
-- La exportación de animales presentes es una instantánea de consulta; no acredita por sí sola una compra, el pago de un animal ni la recepción administrativa de un FMA.
-- No se puede inferir del archivo una fecha de traslado, RUP de origen/destino, número de FMA, proveedor o costo pagado.
-- La presencia en SGIC debe reconciliarse con la recepción oficial de movimientos en SIPECweb: animales en tránsito no equivalen automáticamente a existencias recepcionadas.
-- Para incorporar DIIO en una etapa futura deberán resolverse: homologación de razas, lote interno, fecha y costo de adquisición, control de duplicados y confirmación explícita transaccional.
-- No se almacena contraseña SAG ni se efectúa scraping del portal.
+1. Ejecutar `npm run test:sipec` y `npm run build` desde `frontend/`.
+2. Comparar una exportación real y comprobar los ceros iniciales del DIIO.
+3. Confirmar que la carga de archivo **sin presionar incorporar** no realice escritura alguna.
+4. Verificar valores por animal, costo total, homologación, lote y tipo.
+5. En un entorno controlado, probar que un ingreso inicial no cree compra y un ingreso tipo compra sí genere su detalle contable.
+6. Probar rechazo de DIIO repetido y autorización insuficiente.
+7. Para ventas con precios individuales, comprobar que la suma de ingresos por lote iguale la suma de precios por DIIO, y que cada animal pase a VENDIDO.
+8. Utilizar pruebas SQL transaccionales revertidas o un proyecto separado; nunca dejar animales sintéticos en producción.
 
-## 6. Pruebas
-
-1. Utilizar una exportación `.xls` válida y comprobar que los DIIO conservan ceros iniciales.
-2. Confirmar el número de animales válidos y las observaciones de validación.
-3. En una base sin animales, comprobar que todos los DIIO del archivo figuren como nuevos.
-4. Ejecutar nuevamente la misma exportación y verificar que el proceso no añada animales.
-5. Probar un archivo corrupto o en formato no admitido y verificar el mensaje controlado.
-6. Ejecutar `npm run test:sipec` y `npm run build`.
-
-## 7. Interoperabilidad oficial
-
-No hay una API SAG pública integrada en SGIC. Una sincronización automática requeriría confirmar ante el SAG un servicio o convenio de interoperabilidad autorizado para el RUP. La modalidad operativa disponible es la exportación manual desde SIPECweb más comparación asistida en SGIC.
-
-Fuentes institucionales: [SIPECweb SAG](https://www.sag.gob.cl/ambitos-de-accion/sistema-oficial-de-informacion-pecuaria-sipecweb) y [Manual SIPECweb para titulares de RUP](https://www.sag.gob.cl/sites/default/files/MANUAL%20USUARIO%20EXTERNO%20TITULAR%20SIPECWEB%20OCT%202024.pdf).
+Fuentes: [SIPECweb SAG](https://www.sag.gob.cl/ambitos-de-accion/sistema-oficial-de-informacion-pecuaria-sipecweb) · [Manual institucional](https://www.sag.gob.cl/sites/default/files/MANUAL%20USUARIO%20EXTERNO%20TITULAR%20SIPECWEB%20OCT%202024.pdf).

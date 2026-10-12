@@ -35,7 +35,6 @@ export function ProfitabilityReport(){
  },[])
  const ingresos=sum(rows,'ingresos_venta')
  const costo=sum(rows,'costo_reconocido')
- const gastosNoImputados=0
  const margen=ingresos>0?((ingresos-costo)/ingresos*100).toFixed(1):'0.0'
  return <div className="space-y-5">
   <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -74,7 +73,7 @@ export function ProfitabilityReport(){
         </tr>)}</tbody>
       </table></div>}
     </div>
-    {gastosNoImputados===0&&<p className="text-xs text-slate-500">Nota: no se incluye un cálculo de gastos generales ni otros descuentos comerciales fuera de las ventas registradas.</p>}
+    <p className="text-xs text-slate-500">Nota: las cifras de utilidad excluyen gastos generales no imputados y descuentos comerciales no registrados.</p>
   </>}
  </div>
 }

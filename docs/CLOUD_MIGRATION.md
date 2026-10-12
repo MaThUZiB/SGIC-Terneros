@@ -1,65 +1,68 @@
-# Arquitectura objetivo y secuencia de migración
+# Arquitectura, despliegue y mantenimiento
 
-**Estado (12/10/2026):** producción preparada en el proyecto Supabase Free `mtecrgoyrfclnlctenss`, con 14 migraciones, 28 tablas y datos empresariales vacíos. El proyecto anterior `rsqdtslkndgtaejkaoju` es histórico y NO se ha utilizado como fuente de datos. Pendiente crear y activar usuario administrador para efectuar el primer inicio de sesión. [Guía de puesta en marcha](./PRODUCTION_SETUP.md).
+## 1. Plataforma vigente
 
-## Componentes
+SGIC-Terneros funciona con frontend React/TypeScript/Vite en Cloudflare Pages y backend gestionado Supabase: Auth, PostgreSQL, Data API, RLS y funciones SQL RPC. No requiere servidor Django en el entorno cloud.
 
-- GitHub: código fuente, pull requests y revisiones.
-- Cloudflare Pages: publicación del frontend React/Vite en `frontend/dist`.
-- Supabase Free: PostgreSQL, Auth, RLS, Storage y funciones transaccionales.
-- Django: referencia de reglas actuales durante la transición; no ejecutable en Pages.
-
-## Flujo de datos implementado
+- **Repositorio:** https://github.com/MaThUZiB/SGIC-Terneros
+- **Aplicación:** https://sgic-terneros.pages.dev/
+- **Proyecto Supabase operativo:** `mtecrgoyrfclnlctenss`, región `sa-east-1`.
+- **Rama de publicación:** `main`.
+- **Migraciones:** 14 archivos de `supabase/migrations/`, ejecutados en orden de versión.
 
 ```mermaid
 flowchart TD
- Browser[React en Cloudflare Pages] --> Auth[Supabase Auth]
- Browser --> Data[Data API + RLS]
- Browser --> RPC[Funciones SQL RPC autorizadas]
- Data --> DB[(PostgreSQL)]
- RPC --> DB
- RPC --> Audit[Registro de auditoría]
- Audit --> DB
+ GH["GitHub: main"] --> CI["GitHub Actions"]
+ GH --> CF["Cloudflare Pages / React"]
+ U["Usuario autorizado"] --> CF
+ CF --> AUTH["Supabase Auth"]
+ CF --> API["Data API + RLS"]
+ CF --> RPC["Funciones PostgreSQL (RPC)"]
+ API --> PG[("PostgreSQL")]
+ RPC --> PG
+ PG --> AU["Auditoría y kardex"]
 ```
 
-## Configuración de Cloudflare Pages
+Las peticiones de lectura autorizadas utilizan Supabase Data API; las operaciones que mutan datos empresariales se realizan por RPC SQL. El cliente nunca incorpora claves privilegiadas.
 
-1. Despliegue ya vinculado a GitHub en `main`: https://sgic-terneros.pages.dev/.
-2. Root directory: `frontend`.
-3. Build command: `npm ci && npm run build`.
-4. Build output directory: `dist`.
-5. La compilación de producción de `frontend/src/api/supabase.ts` se fija a la URL y `sb_publishable_` públicas del proyecto `mtecrgoyrfclnlctenss`; ignora las antiguas variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` que pudieran permanecer en Cloudflare. Si más adelante se rota la clave, actualizar este archivo en GitHub. Nunca publicar secretos ni service_role.
-6. El archivo `frontend/public/_redirects` cubre rutas de React Router en Cloudflare Pages.
-7. En modo Supabase, las pantallas operacionales utilizan RPC auditadas y lectura protegida. Las pantallas Django históricas continúan solo en modo de desarrollo Django local.
+## 2. Desarrollo local
 
-## Plan de evolución (fases ejecutadas y pendientes)
+1. Instalar Node.js 22 y npm.
+2. Ejecutar `cd frontend` y `npm ci`.
+3. Crear `frontend/.env.local` desde `frontend/.env.example`.
+4. Configurar `VITE_AUTH_PROVIDER=supabase`, `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` **solo con valores públicos** del proyecto autorizado.
+5. Ejecutar `npm run dev` y abrir la URL indicada por Vite.
+6. Antes de publicar, ejecutar `npm run test:sipec`, `npm run build` y `npm audit --omit=dev --audit-level=high`.
 
-1. Inventario: exportar contratos Django, modelos y reglas actuales; definir invariantes de DIIO, stock, PMP y costos.
-2. Datos: crear migraciones versionadas en `supabase/migrations`; restricciones SQL, FK, índices y política RLS deny-by-default.
-3. Identidad: integrar Supabase Auth y autorización por roles verificados del servidor.
-4. **Implementado:** RPC transaccionales de compras, ganadería, stock/PMP, alimentación, sanidad, gastos, ventas con DIIO explícitos, roles y auditoría; pendientes pruebas de concurrencia real y política de reversión.
-5. **Implementado:** portal cloud React conectado a Supabase para consultas, formularios transaccionales, historial, reportes y usuarios; la implementación Django se conserva aislada como legado.
-6. Calidad: pruebas RLS, privilegios, integridad, reversas y conflictos concurrentes; pruebas visuales y responsivas.
-7. Operación: exportaciones cifradas, restauración ensayada, pausas del plan Free, monitoreo y decisión de continuidad.
+## 3. Despliegue Cloudflare Pages
 
-## Criterios de liberación
+1. Vincular el repositorio GitHub y seleccionar la rama `main`.
+2. Usar directorio raíz `frontend`.
+3. Configurar comando de construcción `npm ci && npm run build`.
+4. Configurar salida `dist`.
+5. Comprobar `frontend/public/_redirects` para navegación directa a rutas internas.
+6. Verificar la publicación, el inicio de sesión y la carga de módulos con un usuario autorizado.
 
-- Prohibido acceder a tablas empresariales sin sesión y sin RLS.
-- La clave `service_role` nunca se expone en el navegador.
-- Todo movimiento de inventario genera movimiento y auditoría en la misma transacción.
-- Una venta confirmada reconoce costos una sola vez y registra DIIO explícitos.
-- Pruebas de restauración documentadas antes de cargar datos empresariales reales.
+**Configuración actual:** el build de producción de `frontend/src/api/supabase.ts` selecciona la URL y la clave `sb_publishable_` del proyecto productivo. En producción ignora variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` definidas en Cloudflare. Para cambiar de instancia o rotar clave, revisar el código y generar un nuevo despliegue; las variables de Cloudflare deben mantenerse documentadas para evitar confusiones, pero no alteran el destino compilado actual.
 
-**Manual de arquitectura:** [Notion](https://app.notion.com/p/3f7b5e350d7181f5957df2b6c8b54634).
+## 4. Base de datos y migraciones
 
-## Identidades y permisos implementados
+1. Preparar el proyecto Supabase con Auth y PostgreSQL.
+2. Aplicar exclusivamente los archivos SQL de `supabase/migrations/` en orden, mediante procedimiento de migración verificado.
+3. No ejecutar `supabase/seeds/demo_20261012.sql` en una base con información operativa.
+4. Comprobar tablas, claves foráneas, índices, RLS, funciones RPC y permisos.
+5. Crear usuarios con Supabase Auth; verificar la existencia del perfil inicial y habilitarlos por un administrador.
+6. Ejecutar consultas de control de stock, compras y lotes desde `supabase/tests/integrity_audit.sql`, sin alterar información.
 
-- Trigger privado crea perfil de cada usuario Auth con rol `OPERADOR` e `activo=false`.
-- Un administrador habilita usuarios de forma controlada desde SQL Editor; ninguna clave secreta se publica en React.
-- Cambios de rol/estado generan auditoría y solo el perfil propio es visible por RLS.
-- React usa el SDK oficial de Supabase con versión bloqueada; ingreso con correo/contraseña, validación de sesión y perfil. Las rutas empresariales Django quedan excluidas del modo Supabase.
-- Ver [procedimiento operativo](../supabase/README.md) para alta de administrador e instrucciones de validación.
+**Esquema e histórico de migraciones:** los archivos SQL constituyen la fuente versionada; no modificar tablas manualmente en producción sin documentar la migración correspondiente.
 
-## Manual actualizado
+## 5. Mantenimiento
 
-Consultar [procesos operativos, límites y pruebas](./OPERACIONES_SUPABASE.md). No confundir una compilación correcta con pruebas E2E autenticadas ni con certificación para datos empresariales reales.
+- Gestionar nuevas funcionalidades en ramas y fusionar a `main` después de revisión y CI.
+- Mantener claves secretas y credenciales de base de datos fuera del repositorio y del frontend.
+- Verificar permisos y políticas RLS al incorporar tablas o funciones.
+- Mantener copias cifradas exportadas periódicamente y comprobar restauraciones.
+- Revisar límites y disponibilidad del plan Supabase Free en el panel oficial.
+- El módulo SIPECweb compara archivos XML Spreadsheet 2003 en el navegador; no existe sincronización desatendida con SIPECweb.
+
+Más información: [alta inicial](./PRODUCTION_SETUP.md), [operaciones](./OPERACIONES_SUPABASE.md), [verificaciones](./PRODUCTION_READINESS.md) y [SIPECweb](./SIPEC_INTEGRACION.md).

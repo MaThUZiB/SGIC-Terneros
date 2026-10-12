@@ -235,7 +235,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-semibold">Precio común (CLP)
-            <input type="number" min="0.01" step="0.01" value={bulk} onChange={e=>setBulk(e.target.value)}
+            <input type="text" inputMode="decimal" autoComplete="off" value={bulk} onChange={e=>setBulk(e.target.value)}
               className="mt-1 block w-36 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"/>
           </label>
           <button type="button" onClick={applyBulk} className="rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900">Aplicar a seleccionados</button>
@@ -267,7 +267,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
               <td className="p-3">{r.raza}</td>
               <td className="p-3">{r.sexo}</td>
               <td className="p-3">{r.fechaNacimiento||'—'}</td>
-              <td className="p-3"><input type="number" min="0.01" max="9999999999.99" step="0.01"
+              <td className="p-3"><input type="text" inputMode="decimal" autoComplete="off"
                 aria-label={'Valor base DIIO '+r.diio} disabled={!r.selected}
                 value={r.precio} onChange={e=>updateRow(r.diio,{precio:e.target.value})}
                 className={'w-36 rounded-lg border p-2 disabled:bg-slate-100 '+(r.selected&&!validPrice(r.precio)?'border-amber-400':'border-slate-300')}/></td>

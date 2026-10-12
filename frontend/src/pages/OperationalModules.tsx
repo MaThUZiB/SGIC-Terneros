@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { supabase } from '../api/supabase'
 
 type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number }
@@ -35,9 +36,9 @@ const S: Record<string, Spec> = {
 }
 const groups: Record<string, string[]> = {
   Ganadería:['compraAnimal','peso','fallecimiento','division','animalRectificar'],
-  Inventario:['compraInsumo','confirmar','anular','ajuste','presentacion','conversion','productoEditar'],
+  Inventario:['compraInsumo','ajuste','presentacion','conversion','productoEditar'],
   Producción:['consumo','consumoPlan','tratamiento','planDetalle','asignarPlan'],
-  Finanzas:['borradorVenta','confirmarVenta','anularVenta','venta','gasto'],
+  Finanzas:['borradorVenta','venta','gasto'],
   Catálogos:['catalogo'],
 }
 const catalogs = [
@@ -48,8 +49,8 @@ const catalogs = [
 ]
 const fechaLocal=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 const base=():Record<string,string>=>({fecha:fechaLocal(),confirmar_ahora:'SI'})
-const n = (v: string) => Number(v)
-const optionalN = (v: string) => v ? Number(v) : null
+const n = (v: string) => Number(v.replace(',','.'))
+const optionalN = (v: string) => v ? n(v) : null
 const money=(v:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:2}).format(v)
 const round2=(v:number)=>Math.round((v+Number.EPSILON)*100)/100
 function purchaseLine(v:Record<string,string>,lists:Lists):Record<string,unknown>|null {
@@ -98,11 +99,11 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'compraAnimal':
       method='sgic_registrar_compra_animales'
       params={p_lote_codigo:v.lote_codigo||'',p_lote_id:optionalN(v.lote_id),
-        p_proveedor_id:optionalN(v.proveedor_id),p_fecha:v.fecha,p_animales:[...batchAnimals,{
-          diio:v.diio,raza_id:n(v.raza_id),sexo:v.sexo||'MACHO',
+        p_proveedor_id:optionalN(v.proveedor_id),p_fecha:v.fecha,p_animales:[...batchAnimals,...(v.diio?.trim()?[{
+          diio:v.diio.trim(),raza_id:n(v.raza_id),sexo:v.sexo||'MACHO',
           edad_aproximada_dias:n(v.edad||'0'),precio_adquisicion:n(v.precio),
           peso_ingreso_kg:v.peso||null
-        }]};break
+        }]:[])]};break
     case 'peso':method='sgic_registrar_peso';params={p_animal_id:n(v.animal_id),p_peso:n(v.peso),p_fecha:v.fecha};break
     case 'fallecimiento':method='sgic_fallecimiento';params={p_animal_id:n(v.animal_id),p_motivo:v.motivo};break
     case 'division':method='sgic_dividir_lote';params={p_lote_id:n(v.lote_id),p_codigo:v.codigo,p_animales:selected};break
@@ -145,6 +146,8 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [ok,setOk]=useState('')
+  const [confirmDetails,setConfirmDetails]=useState<ConfirmDetails|null>(null)
+  const pendingScrollY=useRef<number|null>(null)
   async function refresh(){
     if(!supabase)return
     setLoading(true)
@@ -157,7 +160,19 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     setLoading(false)
   }
   useEffect(()=>{void refresh()},[])
+  useLayoutEffect(()=>{
+    if(pendingScrollY.current!==null){
+      window.scrollTo({top:pendingScrollY.current,behavior:'instant'})
+      pendingScrollY.current=null
+    }
+  },[group,action])
+  function pickAction(key:string) {
+    pendingScrollY.current=window.scrollY
+    setAction(key);setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')
+    setConfirmDetails(null)
+  }
   function pick(g:string){
+    pendingScrollY.current=window.scrollY
     setGroup(g)
     const next=groups[g].find(x=>esAdmin||S[x].role==='TODOS')
     if(next)setAction(next)
@@ -187,6 +202,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
       if(!values.diio||!values.raza_id||!values.precio||!values.edad){
         setError('Completa DIIO, raza, precio y edad antes de agregar al lote');return
       }
+      if(batchAnimals.some(item=>item.diio===values.diio.trim())){setError('DIIO repetido en el detalle del lote.');return}
       setBatchAnimals(prev=>[...prev,{
         diio:values.diio,raza_id:n(values.raza_id),sexo:values.sexo||'MACHO',
         edad_aproximada_dias:n(values.edad),precio_adquisicion:n(values.precio),
@@ -204,27 +220,53 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   }
   async function submit(e:FormEvent){
     e.preventDefault();if(busy)return
+    if(action==='compraAnimal'){
+      const partial=['diio','raza_id','sexo','edad','precio','peso'].some(k=>Boolean((values[k]||'').trim()))
+      if(!partial && !batchAnimals.length){setError('Agrega al menos un animal.');return}
+      if(partial && (!values.diio?.trim() || !values.raza_id || !values.precio || !values.edad)){
+        setError('Completa el último animal o deja sus campos vacíos para registrar el detalle agregado.');return
+      }
+    }
+    prepareSubmit()
+  }
+  function prepareSubmit(){
     if((action==='venta'||action==='borradorVenta'||action==='division')&&selected.length===0){setError('Seleccione al menos un DIIO activo');return}
     if(action==='animalRectificar'&&(!values.animal_id||!['MACHO','HEMBRA'].includes(values.sexo)||(values.motivo||'').trim().length<5)){
       setError('Selecciona un animal y su sexo correcto. Explica el motivo con al menos 5 caracteres.');return
     }
+    let details:ConfirmDetails|null=null
     if(action==='compraInsumo'){
-      try{
+      try {
         const current=purchaseLine(values,lists)
         const items=[...batchItems,...(current?[current]:[])]
         if(!items.length)throw Error('Agrega al menos un producto.')
-        const total=items.reduce((sum,item)=>sum+subtotal(item),0)
-        const text=values.confirmar_ahora==='NO'
-          ? `Guardar borrador por ${money(total)}. NO ingresará stock hasta confirmar el borrador. ¿Continuar?`
-          : `Comprar por ${money(total)}. Ingresará stock, movimiento y PMP inmediatamente. ¿Continuar?`
-        if(!window.confirm(text))return
+        const amount=items.reduce((sum,item)=>sum+subtotal(item),0)
+        const immediate=values.confirmar_ahora!=='NO'
+        details={
+          title:immediate?'Confirmar compra':'Enviar solicitud de compra',
+          description:immediate
+            ?`Monto: ${money(amount)}. Se actualizarán las existencias, el kardex y el costo promedio. Revisa los precios antes de continuar.`
+            :`Monto: ${money(amount)}. La compra quedará en Solicitudes pendientes y no modificará el inventario.`,
+          confirmLabel:immediate?'Confirmar compra':'Enviar a pendientes'
+        }
       }catch(e){setError(e instanceof Error?e.message:'Compra inválida');return}
+    }else if(action==='fallecimiento'){
+      details={title:'Registrar fallecimiento',description:'El animal quedará identificado como fallecido y se descontará del conteo del lote. El historial se conservará.',confirmLabel:'Confirmar fallecimiento',danger:true}
+    }else if(action==='ajuste'){
+      details={title:'Aplicar ajuste al inventario',description:`Variación de ${values.delta||'0'} unidades. Motivo: ${values.motivo||'Sin motivo'}. Quedará registrada en el kardex y la auditoría.`,confirmLabel:'Aplicar ajuste',danger:n(values.delta||'0')<0}
+    }else if(action==='venta'||action==='confirmarVenta'){
+      details={title:'Confirmar venta',description:'Se cerrará la venta de los DIIO seleccionados y se reconocerán sus costos. No puede deshacerse directamente.',confirmLabel:'Confirmar venta',danger:true}
+    }else if(action==='borradorVenta'){
+      details={title:'Solicitar aprobación de venta',description:'Los animales no cambiarán de estado hasta la aprobación en Solicitudes pendientes.',confirmLabel:'Enviar solicitud'}
+    }else if(action==='animalRectificar'){
+      details={title:'Guardar rectificación',description:'Se corregirá el sexo registrado y se conservará el motivo en la auditoría.',confirmLabel:'Guardar corrección'}
     }
-    if(action==='confirmar'){
-      const current=(lists.compra||[]).find(x=>String(x.id)===values.compra_id)
-      if(!current||!window.confirm(`Confirmar borrador #${current.id} por ${money(Number(current.total||0))}. Revisa el total; la acción actualizará el inventario y no podrá revertirse directamente. ¿Continuar?`))return
-    }else if(['venta','confirmarVenta','fallecimiento','ajuste'].includes(action)&&
-      !window.confirm('Esta operación registrará cambios auditados. ¿Confirmas?'))return
+    if(details){setConfirmDetails(details);return}
+    void executeOperation()
+  }
+  async function executeOperation(){
+    if(busy)return
+    setConfirmDetails(null)
     setBusy(true);setError('');setOk('')
     try{
       const result=await callOperation(action,values,selected,batchAnimals,batchItems,lists)

@@ -1,6 +1,6 @@
 # Migraciones Supabase de SGIC-Terneros
 
-Estado: **esquema inicial versionado, aún no aplicado ni validado en un proyecto Supabase**. El backend Django continúa siendo la implementación operativa de referencia.
+Estado: **migraciones iniciales aplicadas el 12/10/2026 al proyecto Supabase de desarrollo `rsqdtslkndgtaejkaoju`**. Se verificaron 28 tablas con RLS activo y el asesor de seguridad no devolvió alertas. El backend Django continúa siendo la implementación operativa de referencia.
 
 ## Orden
 
@@ -36,3 +36,15 @@ No ejecutar `db push` contra una base productiva ni copiar información real has
 No exponer claves privilegiadas a React. Definir RLS y `GRANT` explícitos antes de exponer cada operación. Las funciones con `SECURITY DEFINER` deberán tener `search_path` seguro y verificaciones de rol en servidor. Mantener migraciones secuenciales y no modificar migraciones ya aplicadas.
 
 [Manual de arquitectura en Notion](https://app.notion.com/p/3f7b5e350d7181f5957df2b6c8b54634).
+
+## Ejecución verificada — 12/10/2026
+
+- Proyecto: `MaThUZiB's Project`, región `sa-east-1` (identificador `rsqdtslkndgtaejkaoju`).
+- Migración remota `20261012132425_initial_schema_sgic_20261012`: correcta.
+- Migración remota `20261012132436_security_baseline_sgic_20261012`: correcta.
+- 28/28 tablas de `public` con RLS activado; 0 filas de negocio en el momento de la verificación.
+- `anon` y `authenticated` sin permiso de lectura en `animal`.
+- `authenticated` puede consultar únicamente `perfil` conforme a política de identidad; no puede actualizarlo.
+- Asesor de seguridad: sin avisos.
+- **Historial:** el identificador cronológico remoto de las migraciones fue generado al aplicarlas mediante integración; no coincide con la marca en los nombres de los archivos Git. Antes de introducir el CLI en otros entornos, reconciliar el historial para evitar reaplicación. No ejecutar `db push` contra este proyecto sin comprobar antes `supabase_migrations.schema_migrations`.
+- El frontend sigue utilizando Django. No se ha creado identidad de administrador ni políticas de acceso a tablas empresariales.

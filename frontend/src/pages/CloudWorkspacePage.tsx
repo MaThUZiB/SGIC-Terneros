@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabase'
 import { useAuth } from '../auth/AuthContext'
 import { OperationalModules, OperationsHistory } from './OperationalModules'
+import { UserManagement } from './UserManagement'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -17,7 +18,7 @@ type Datos = {
   animales: Animal[]; lotes: Lote[]; productos: Producto[]
   proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]
 }
-type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras' | 'operaciones' | 'historial'
+type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras' | 'operaciones' | 'historial' | 'usuarios'
 
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
@@ -28,6 +29,7 @@ const tabs: { id: Pestaña; label: string }[] = [
   { id: 'compras', label: 'Compras' },
   { id: 'operaciones', label: 'Operaciones' },
   { id: 'historial', label: 'Historial y auditoría' },
+  { id: 'usuarios', label: 'Usuarios' },
 ]
 
 function Indicador({ nombre, valor, nota }: { nombre: string; valor: string; nota: string }) {
@@ -162,7 +164,7 @@ export function CloudWorkspacePage() {
         )}
 
         <nav aria-label="Módulos de consulta" className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
-          {tabs.map(t => (
+          {tabs.filter(t => esAdmin || t.id !== 'usuarios').map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setBuscar('') }}
               aria-current={tab === t.id ? 'page' : undefined}
               className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'bg-emerald-900 text-white' : 'text-slate-600 hover:bg-white'}`}>
@@ -181,6 +183,7 @@ export function CloudWorkspacePage() {
           <>
             {tab === 'operaciones' && <OperationalModules esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
+            {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'resumen' && (
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

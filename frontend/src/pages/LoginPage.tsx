@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { extraerError } from '../api/client'
+import { usaSupabase } from '../api/supabase'
 import { Boton, MensajeError } from '../components/ui'
 
 export function LoginPage() {
@@ -39,8 +40,10 @@ export function LoginPage() {
         </div>
         {error && <MensajeError mensaje={error} />}
         <label className="block">
-          <span className="text-sm font-medium text-slate-600">Usuario</span>
+          <span className="text-sm font-medium text-slate-600">{usaSupabase ? 'Correo electrónico' : 'Usuario'}</span>
           <input
+            type={usaSupabase ? 'email' : 'text'}
+            autoComplete={usaSupabase ? 'email' : 'username'}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -52,6 +55,7 @@ export function LoginPage() {
           <span className="text-sm font-medium text-slate-600">Contraseña</span>
           <input
             type="password"
+            autoComplete="current-password"
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -62,6 +66,7 @@ export function LoginPage() {
           {cargando ? 'Ingresando...' : 'Ingresar'}
         </Boton>
         <p className="pt-2 text-center text-xs text-slate-400">Acceso restringido a usuarios autorizados</p>
+        {usaSupabase && <p className="text-center text-xs text-slate-500">Las cuentas requieren habilitación administrativa.</p>}
       </form>
     </div>
   )

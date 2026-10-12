@@ -63,6 +63,6 @@ Las peticiones de lectura autorizadas utilizan Supabase Data API; las operacione
 - Verificar permisos y políticas RLS al incorporar tablas o funciones.
 - Mantener copias cifradas exportadas periódicamente y comprobar restauraciones.
 - Revisar límites y disponibilidad del plan Supabase Free en el panel oficial.
-- El módulo SIPECweb compara archivos XML Spreadsheet 2003 en el navegador; no existe sincronización desatendida con SIPECweb.
+- El módulo SIPECweb compara archivos XML Spreadsheet 2003 en el navegador y ofrece incorporación supervisada a través de una RPC transaccional. Ventas incorpora importes por DIIO, conservando la distribución de costos por lote. No existe sincronización automática desatendida con el SAG.
 
 Más información: [alta inicial](./PRODUCTION_SETUP.md), [operaciones](./OPERACIONES_SUPABASE.md), [verificaciones](./PRODUCTION_READINESS.md) y [SIPECweb](./SIPEC_INTEGRACION.md).

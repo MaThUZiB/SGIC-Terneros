@@ -1,3 +1,5 @@
+> **Especificación funcional de referencia (v1.5).** Este documento describe el diseño base previo a la implementación cloud. Para arquitectura y funcionamiento vigentes consultar [README](../README.md), [Operación sobre Supabase](./OPERACIONES_SUPABASE.md), [Arquitectura](./CLOUD_MIGRATION.md) y [SIPECweb](./SIPEC_INTEGRACION.md). Las menciones a Django/API REST aquí no describen el despliegue productivo actual.
+
 # SGIC-Terneros
 ## Sistema de Gestión de Crianza, Inventario y Costos
 

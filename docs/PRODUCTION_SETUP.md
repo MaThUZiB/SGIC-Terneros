@@ -1,55 +1,78 @@
-# SGIC-Terneros — Puesta en marcha de producción
+# Configuración inicial y administración de usuarios
 
-**Proyecto activo:** [SGIC-Terneros Producción](https://supabase.com/dashboard/project/mtecrgoyrfclnlctenss) · Región `sa-east-1` · Supabase Free · costo de creación informado: US$0/mes.
+## 1. Datos del entorno
 
-**Aplicación:** https://sgic-terneros.pages.dev/ · repositorio `MaThUZiB/SGIC-Terneros`, rama `main`.
+- **Aplicación:** https://sgic-terneros.pages.dev/
+- **Proyecto:** [SGIC-Terneros Producción](https://supabase.com/dashboard/project/mtecrgoyrfclnlctenss)
+- **Región:** `sa-east-1`.
+- **Identidad:** Supabase Auth por correo y contraseña.
+- **Autorización:** tabla `public.perfil` con `rol` (`ADMIN` o `OPERADOR`) y `activo`.
 
-## Instalación efectuada
+La base utiliza las 14 migraciones SQL disponibles en `supabase/migrations/`. No ejecutar scripts de datos de ejemplo en producción.
 
-- Se creó un proyecto Supabase **nuevo**, sin importar información ni cuentas desde la instancia anterior.
-- Se aplicaron las **14 migraciones** existentes en `supabase/migrations` por orden cronológico. Se ajustó el historial de versiones remoto para coincidir con los nombres versionados en GitHub.
-- Se verificaron las tablas de negocio, RLS, funciones RPC y registros vacíos: **0 animales, 0 lotes, 0 productos, 0 razas, 0 compras, 0 movimientos de inventario, 0 auditorías y 0 usuarios Auth/perfiles**.
-- **No se ejecutó** `supabase/seeds/demo_20261012.sql` ni se copiaron registros, contraseñas o usuarios de `rsqdtslkndgtaejkaoju`.
-- Para asegurar el cambio sin acceso al panel Cloudflare, el frontend compilado para producción toma la URL y clave **pública** `sb_publishable_` de la nueva instancia desde `frontend/src/api/supabase.ts`. Las variables antiguas de Cloudflare se ignoran en ese build; no se guardaron claves secretas.
-- No es necesario crear razas, proveedores o artículos ficticios de inicio. El administrador podrá introducir los catálogos reales.
+## 2. Inicio de sesión
 
-## Alta inicial del administrador (requiere intervención del titular)
+1. Abrir la aplicación web.
+2. Ingresar el correo y la contraseña de la cuenta creada en Supabase Auth del proyecto correcto.
+3. El sistema comprueba la sesión y consulta el perfil propio por RLS.
+4. Si el perfil no existe o `activo=false`, el ingreso se deniega con un mensaje de autorización. Solicitar habilitación al administrador.
+5. Utilizar **Salir** para terminar la sesión.
 
-1. Abrir [Supabase Producción → Authentication → Users](https://supabase.com/dashboard/project/mtecrgoyrfclnlctenss/auth/users).
-2. Crear/invitar el correo del administrador **en el proyecto nuevo** y configurar una contraseña exclusiva (diferente de la cuenta del proyecto anterior). Comprobar la confirmación del correo de acuerdo con el flujo elegido.
-3. El trigger `sgic_auth_user_created` genera automáticamente un `perfil` inicial `OPERADOR` e `activo=false`.
-4. Abrir [SQL Editor de producción](https://supabase.com/dashboard/project/mtecrgoyrfclnlctenss/sql/new) y ejecutar, sustituyendo el correo indicado:
+## 3. Primera habilitación administrativa
 
-```sql
+**Procedimiento de arranque, aplicable solo cuando aún no exista un ADMIN activo.** El trigger de alta de Auth registra cuentas nuevas como `OPERADOR` y `activo=false`.
+
+1. Abrir [Authentication → Users](https://supabase.com/dashboard/project/mtecrgoyrfclnlctenss/auth/users) y crear el primer usuario o verificar el usuario existente.
+2. Confirmar su dirección de correo.
+3. Abrir [SQL Editor](https://supabase.com/dashboard/project/mtecrgoyrfclnlctenss/sql/new).
+4. Ejecutar la siguiente instrucción con el correo correspondiente, verificando que sea la identidad correcta:
+
+~~~sql
 update public.perfil p
 set rol = 'ADMIN', activo = true
 from auth.users u
-where u.id = p.id
-  and lower(u.email) = lower('REEMPLAZAR_CORREO_ADMIN')
+where p.id = u.id
+  and lower(u.email) = lower('CORREO_ADMINISTRADOR')
   and u.email_confirmed_at is not null
   and (u.banned_until is null or u.banned_until <= now())
-returning p.id, p.rol, p.activo;
-```
+returning p.rol, p.activo;
+~~~
 
-5. Verificar **una fila** con `ADMIN` y `true`. Si retorna cero filas, comprobar registro y confirmación del correo antes de reintentar.
-6. Esperar el despliegue de Cloudflare desde `main`. Cerrar sesión de la app anterior (si existía), entrar a https://sgic-terneros.pages.dev/, iniciar sesión **con la cuenta creada en el nuevo Supabase**, comprobar que todas las listas partan vacías y crear los catálogos reales desde Administración.
-7. En la cuenta del titular habilitar a los demás familiares con el rol adecuado usando la interfaz de Usuarios (solo un administrador puede autorizar).
-8. Opcional pero recomendable: en Cloudflare Pages → Settings → Variables, sustituir también las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` antiguas para evitar confusión futura, aunque el build de producción ya utiliza el proyecto nuevo.
+5. Comprobar **una fila** con `ADMIN` y `true`. El cambio se audita mediante el trigger del perfil.
+6. Cerrar la sesión si ya estaba iniciada y volver a entrar a la aplicación.
 
-## Cierre del proyecto antiguo
+**Operación recurrente:** esta consulta manual no se requiere para nuevos operadores; el administrador utiliza **Administración → Usuarios**.
 
-El proyecto `rsqdtslkndgtaejkaoju` era solo para pruebas; todos sus registros son descartables según autorización expresa del titular. **No se migra absolutamente nada**.
+## 4. Alta de familiares u operadores
 
-Después de validar inicio de sesión y consultas contra el proyecto nuevo, el titular puede eliminar el antiguo desde el Dashboard de Supabase (Project Settings → General → Delete project). Esta acción es irreversible. La integración de ChatGPT disponible no expone una operación de eliminación de proyectos: **no se ha eliminado**.
+1. Crear la identidad en Supabase Auth según el procedimiento de invitación/alta configurado.
+2. Acceder a **Administración → Usuarios** con perfil ADMIN.
+3. Identificar la cuenta pendiente, asignar `OPERADOR` o `ADMIN` y activar el acceso según sus funciones.
+4. Comprobar que pueda iniciar sesión y visualizar únicamente las operaciones permitidas.
+5. Para retirar el acceso, desactivar su perfil. La aplicación registra el cambio de permisos.
 
-## Mantenimiento proporcional para cinco usuarios familiares
+Evitar compartir cuentas: cada integrante debe utilizar credenciales propias.
 
-- Cada persona utiliza su propio usuario de Auth; mínimo privilegio ADMIN/OPERADOR.
-- Exportar datos a una copia externa cifrada semanalmente y antes de modificaciones importantes. Supabase Free no garantiza los respaldos diarios administrados de los planes de pago.
-- Evitar pruebas destructivas en producción. Verificar cambios mediante transacciones revertidas o usando otros proyectos de prueba cuando sea necesario.
-- Conservar archivos de migración en GitHub; no versionar contraseñas ni tokens secretos.
-- El acceso a la nueva base está protegido por RLS; sin crear una cuenta Auth autorizada, nadie puede operar desde el navegador.
+## 5. Configurar el uso cotidiano
 
-## Verificaciones pendientes
+1. Crear razas, proveedores, categorías de producto, unidades de medida y categorías de gasto desde **Catálogos**.
+2. Registrar productos, presentaciones y equivalencias comerciales antes de comprar insumos.
+3. Registrar lotes y animales desde sus módulos, con DIIO válido y costos de adquisición según corresponda.
+4. Confirmar compras de insumos para reflejar existencias y PMP; los borradores no alteran stock.
+5. Registrar consumos, tratamientos, pesajes y operaciones de venta desde sus módulos.
+6. Consultar **Solicitudes pendientes** para resolver compras/ventas en borrador.
+7. Consultar **Historial y auditoría** para revisar operaciones y cambios.
 
-La base nueva está completamente vacía. La prueba E2E autenticada se realizará **después de crear el administrador**. No interpretar 0 registros como error mientras no se carguen catálogos/animales.
+## 6. Verificaciones de funcionamiento
+
+- Al iniciar sesión, el perfil se muestra con el rol correcto.
+- El botón **Actualizar** vuelve a consultar los datos de la pantalla y no modifica registros.
+- Compras confirmadas crean movimientos de inventario; borradores no lo hacen.
+- Un animal vendido o fallecido conserva su historial y deja de contarse como activo.
+- **Animales → Sincronizar con SIPECweb** permite revisar diferencias con un `.xls` exportado por SAG en modo **solo lectura**.
+
+## 7. Seguridad y respaldo
+
+Mantener contraseñas individuales, una o dos cuentas administrativas y respaldos externos cifrados. El plan Free no incluye copias diarias automáticas administradas equivalentes a los planes de pago: planificar exportaciones y comprobar restauración. No cargar archivos empresariales en scripts de demostración.
+
+Ver [arquitectura](./CLOUD_MIGRATION.md), [reglas operativas](./OPERACIONES_SUPABASE.md) y [continuidad](./PRODUCTION_READINESS.md).

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import type { ModuleId } from '../components/SidebarNavigation'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { supabase } from '../api/supabase'
 
@@ -34,12 +35,29 @@ const S: Record<string, Spec> = {
   animalRectificar:{title:'Rectificación de animal',role:'ADMIN',help:'Selecciona un sexo válido y explica el motivo (mínimo cinco caracteres). No necesita fecha; DIIO y costo se conservan.',fields:[F('animal_id','DIIO','animal'),F('sexo','Sexo','sexo'),F('motivo','Motivo de rectificación')]},
   catalogo:{title:'Crear maestro / catálogo',role:'ADMIN',help:'Registra proveedores, razas, unidades, productos, categorías, lotes o planes.',fields:[F('tipo','Tipo','tipo'),F('nombre','Nombre / código')]},
 }
-const groups: Record<string, string[]> = {
-  Ganadería:['compraAnimal','peso','fallecimiento','division','animalRectificar'],
-  Inventario:['compraInsumo','ajuste','presentacion','conversion','productoEditar'],
-  Producción:['consumo','consumoPlan','tratamiento','planDetalle','asignarPlan'],
-  Finanzas:['borradorVenta','venta','gasto'],
-  Catálogos:['catalogo'],
+const contextualActions: Partial<Record<ModuleId,string[]>> = {
+  animales:['compraAnimal','peso','fallecimiento','animalRectificar'],
+  lotes:['division','catalogo'],
+  inventario:['ajuste','presentacion','conversion','productoEditar','catalogo'],
+  compras:['compraInsumo'],
+  planes:['consumo','consumoPlan','planDetalle','asignarPlan','catalogo'],
+  sanidad:['tratamiento'],
+  ventas:['venta','borradorVenta'],
+  gastos:['gasto'],
+  catalogos:['catalogo'],
+}
+const contextualLabels:Record<string,string>={
+  compraAnimal:'Comprar animales',peso:'Registrar pesaje',fallecimiento:'Fallecimiento',
+  animalRectificar:'Rectificar',division:'Dividir lote',compraInsumo:'Comprar insumos',
+  ajuste:'Ajustar stock',presentacion:'Crear presentación',conversion:'Crear conversión',
+  productoEditar:'Editar producto',catalogo:'Crear nuevo registro',
+  consumo:'Registrar consumo',consumoPlan:'Aplicar plan',planDetalle:'Añadir alimento al plan',
+  asignarPlan:'Asignar plan',tratamiento:'Registrar tratamiento',venta:'Registrar venta',
+  borradorVenta:'Solicitar venta',gasto:'Registrar gasto',
+}
+export function getModuleActions(module:ModuleId,esAdmin:boolean){
+  return (contextualActions[module]??[]).filter(id=>esAdmin||S[id].role==='TODOS')
+    .map(id=>({id,label:contextualLabels[id]??S[id].title}))
 }
 const catalogs = [
   {id:'raza',nombre:'Raza'},{id:'proveedor',nombre:'Proveedor'},
@@ -134,11 +152,19 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
   if(result.error) throw Error(result.error.message)
   return result.data
 }
-export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChanged:()=>void}){
-  const [group,setGroup]=useState(esAdmin?'Ganadería':'Producción')
-  const [action,setAction]=useState(esAdmin?'compraAnimal':'consumo')
+export function OperationalModules({
+  esAdmin, onChanged, module, initialAction, onClose,
+}:{
+  esAdmin:boolean; onChanged:()=>void; module:ModuleId; initialAction:string; onClose:()=>void
+}){
+  const allowed=getModuleActions(module,esAdmin)
+  const action=initialAction
+  const fixedCatalogType=action==='catalogo'
+    ? module==='lotes'?'lote':module==='inventario'?'producto':module==='planes'?'plan_consumo':null
+    :null
+  const initialValues=()=>({...base(),...(fixedCatalogType?{tipo:fixedCatalogType}:{})})
   const [lists,setLists]=useState<Lists>({})
-  const [values,setValues]=useState<Record<string,string>>(base())
+  const [values,setValues]=useState<Record<string,string>>(initialValues)
   const [selected,setSelected]=useState<number[]>([])
   const [batchAnimals,setBatchAnimals]=useState<Record<string,unknown>[]>([])
   const [batchItems,setBatchItems]=useState<Record<string,unknown>[]>([])
@@ -147,7 +173,6 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   const [error,setError]=useState('')
   const [ok,setOk]=useState('')
   const [confirmDetails,setConfirmDetails]=useState<ConfirmDetails|null>(null)
-  const pendingScrollY=useRef<number|null>(null)
   async function refresh(){
     if(!supabase)return
     setLoading(true)
@@ -160,24 +185,6 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     setLoading(false)
   }
   useEffect(()=>{void refresh()},[])
-  useLayoutEffect(()=>{
-    if(pendingScrollY.current!==null){
-      window.scrollTo({top:pendingScrollY.current,behavior:'instant'})
-      pendingScrollY.current=null
-    }
-  },[group,action])
-  function pickAction(key:string) {
-    pendingScrollY.current=window.scrollY
-    setAction(key);setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')
-    setConfirmDetails(null)
-  }
-  function pick(g:string){
-    pendingScrollY.current=window.scrollY
-    setGroup(g)
-    const next=groups[g].find(x=>esAdmin||S[x].role==='TODOS')
-    if(next)setAction(next)
-    setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')
-  }
   const more:Field[]=action==='catalogo'?
     values.tipo==='producto'?[F('categoria_id','Categoría de producto','categoria_producto'),F('unidad_base_id','Unidad base','unidad_medida'),F('stock_minimo','Stock mínimo',undefined,'number',true)]:
     values.tipo==='unidad_medida'?[F('codigo','Código abreviado'),F('tipo_unidad','Tipo (MASA / VOLUMEN)')]:
@@ -271,7 +278,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     try{
       const result=await callOperation(action,values,selected,batchAnimals,batchItems,lists)
       setOk(action==='compraInsumo' ? (values.confirmar_ahora==='NO' ? `Solicitud #${result} enviada a Pendientes. No modifica inventario.` : `Compra #${result} confirmada. Stock, kardex y PMP actualizados.`) : 'Operación registrada. Referencia: '+String(result??'confirmada'))
-      setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
+      setValues(initialValues());setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
     }catch(e){
       setError((e instanceof Error?e.message:'Error desconocido') + (action==='animalRectificar'?'. Selecciona sexo y un motivo con al menos cinco caracteres.':'. Comprueba el historial antes de repetir, por si ya se registró.'))
     }finally{setBusy(false)}
@@ -282,29 +289,27 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   const previewTotal=previewItems.reduce((sum,item)=>sum+subtotal(item),0)
   const precioPresentacion=action==='compraInsumo'&&Boolean(values.presentacion_id)
   const candidates=(lists.animal||[]).filter(o=>o.estado==='ACTIVO'&&(action!=='division'||String(o.lote_id)===values.lote_id))
-  return <div className="space-y-5">
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
-      <p className="px-2 pb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">01 · Área de trabajo</p>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-      {Object.keys(groups).filter(g=>esAdmin||['Ganadería','Producción'].includes(g)).map(g=>
-        <button key={g} onClick={()=>pick(g)} className={'rounded-xl border px-4 py-3 text-left text-sm font-semibold '+(group===g?'border-emerald-300 bg-white text-emerald-950 shadow-sm':'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700')}>{g}</button>)}
+  if(!allowed.some(item=>item.id===action)) return null
+  const panelTitle=action==='catalogo'&&fixedCatalogType
+    ?fixedCatalogType==='lote'?'Crear lote':fixedCatalogType==='producto'?'Crear producto':'Crear plan de alimentación'
+    :S[action].title
+  return <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-md shadow-emerald-900/5 sm:p-7" aria-label={panelTitle}>
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
+      <div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-emerald-700">Nueva operación · {panelTitle}</p>
+        <h2 className="text-xl font-semibold tracking-tight text-slate-900">{panelTitle}</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{S[action].help}</p>
       </div>
+      <button type="button" onClick={onClose} disabled={busy}
+        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+        Cerrar formulario
+      </button>
     </div>
-    <div className="grid min-h-[900px] gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[250px_minmax(0,1fr)] sm:p-7">
-      <aside aria-label="Acciones del área" className="rounded-xl border border-slate-200 bg-slate-50 p-3 lg:self-start">
-        <h2 className="mb-3 border-b border-slate-200 pb-3 text-xs font-semibold uppercase tracking-widest text-slate-600">02 · Acciones de {group}</h2>
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col">
-        {groups[group].filter(k=>esAdmin||S[k].role==='TODOS').map(k=>
-          <button key={k} onClick={()=>pickAction(k)}
-            className={'shrink-0 whitespace-nowrap rounded-xl border-l-4 px-3 py-3 text-left text-sm font-medium lg:w-full lg:whitespace-normal '+(action===k?'border-emerald-400 bg-emerald-900 text-white shadow-sm':'border-transparent bg-white text-slate-700 hover:bg-emerald-50')}>{S[k].title}</button>)}
-        </div>
-      </aside>
-      <section className="min-w-0 space-y-4">
-        <div><h2 className="text-lg font-semibold">{S[action].title}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{S[action].help}</p></div>
-        {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-        {ok&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{ok}</p>}
+    {error&&<p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+    {ok&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{ok}</p>}
+    <div className="max-w-3xl">
         <form onSubmit={submit} className="space-y-4">
-          {S[action].fields.concat(more).map(f=>
+          {S[action].fields.concat(more).map(f=>f.key==='tipo'&&fixedCatalogType?null:
             <label key={f.key} className="block text-sm">
               <span className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
                 ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
@@ -359,10 +364,9 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
             {busy?'Registrando…':action==='compraInsumo'?(values.confirmar_ahora==='NO'?'Guardar borrador':'Comprar y actualizar inventario'):'Registrar operación'}
           </button>
         </form>
-      </section>
     </div>
     <OperationConfirmDialog details={confirmDetails} busy={busy} onConfirm={()=>{void executeOperation()}} onCancel={()=>setConfirmDetails(null)}/>
-  </div>
+  </section>
 }
 const views:Record<string,string[]> = {
   movimiento_inventario:['tipo','fecha_hora','producto_id','cantidad','costo_total','referencia_tipo'],

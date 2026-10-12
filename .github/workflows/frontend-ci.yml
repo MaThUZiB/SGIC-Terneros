@@ -1,0 +1,32 @@
+name: Frontend CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/cloudflare-supabase-foundation-ui
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: TypeScript and Vite build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build

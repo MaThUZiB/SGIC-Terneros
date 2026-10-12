@@ -58,7 +58,7 @@ function label(o: Opt, source: string) {
   if(source==='compra') return '#' + o.id + ' · ' + (o.numero_documento || 'Borrador') + ' · ' + String(o.total)
   return o.nombre || o.codigo || String(o.id)
 }
-async function callOperation(op: string, v: Record<string,string>, selected: number[]) {
+async function callOperation(op: string, v: Record<string,string>, selected: number[], batchAnimals: Record<string,unknown>[], batchItems: Record<string,unknown>[]) {
   if(!supabase) throw Error('Supabase no está configurado')
   let method = ''
   let params: Record<string,unknown> = {}
@@ -80,7 +80,7 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'compraAnimal':
       method='sgic_registrar_compra_animales'
       params={p_lote_codigo:v.lote_codigo||'',p_lote_id:optionalN(v.lote_id),
-        p_proveedor_id:optionalN(v.proveedor_id),p_fecha:v.fecha,p_animales:[{
+        p_proveedor_id:optionalN(v.proveedor_id),p_fecha:v.fecha,p_animales:[...batchAnimals,{
           diio:v.diio,raza_id:n(v.raza_id),sexo:v.sexo||'MACHO',
           edad_aproximada_dias:n(v.edad||'0'),precio_adquisicion:n(v.precio),
           peso_ingreso_kg:v.peso||null
@@ -91,7 +91,7 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'compraInsumo':
       method='sgic_crear_compra_insumo'
       params={p_proveedor_id:n(v.proveedor_id),p_fecha:v.fecha,p_documento:v.documento||null,
-        p_detalles:[{producto_id:n(v.producto_id),cantidad:n(v.cantidad),
+        p_detalles:[...batchItems,{producto_id:n(v.producto_id),cantidad:n(v.cantidad),
           presentacion_id:optionalN(v.presentacion_id),
           ...(v.presentacion_id?{}:{cantidad_base:n(v.cantidad)}),precio_unitario:n(v.precio)}]};break
     case 'confirmar':method='sgic_confirmar_compra_insumo';params={p_compra_id:n(v.compra_id)};break
@@ -119,6 +119,8 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   const [lists,setLists]=useState<Lists>({})
   const [values,setValues]=useState<Record<string,string>>({...base})
   const [selected,setSelected]=useState<number[]>([])
+  const [batchAnimals,setBatchAnimals]=useState<Record<string,unknown>[]>([])
+  const [batchItems,setBatchItems]=useState<Record<string,unknown>[]>([])
   const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -139,7 +141,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     setGroup(g)
     const next=groups[g].find(x=>esAdmin||S[x].role==='TODOS')
     if(next)setAction(next)
-    setValues({...base});setSelected([]);setError('');setOk('')
+    setValues({...base});setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')
   }
   const more:Field[]=action==='catalogo'?
     values.tipo==='producto'?[F('categoria_id','Categoría de producto','categoria_producto'),F('unidad_base_id','Unidad base','unidad_medida'),F('stock_minimo','Stock mínimo',undefined,'number',true)]:
@@ -158,6 +160,31 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     if(source==='lote'||source==='animal')return arr.filter(o=>o.estado==='ACTIVO')
     return arr.filter(o=>o.activo!==false)
   }
+  function addLine(){
+    setError('')
+    if(action==='compraAnimal'){
+      if(!values.diio||!values.raza_id||!values.precio||!values.edad){
+        setError('Completa DIIO, raza, precio y edad antes de agregar al lote');return
+      }
+      setBatchAnimals(prev=>[...prev,{
+        diio:values.diio,raza_id:n(values.raza_id),sexo:values.sexo||'MACHO',
+        edad_aproximada_dias:n(values.edad),precio_adquisicion:n(values.precio),
+        peso_ingreso_kg:values.peso||null
+      }])
+      setValues(prev=>({...prev,diio:'',raza_id:'',sexo:'',edad:'',precio:'',peso:''}))
+    }else if(action==='compraInsumo'){
+      if(!values.producto_id||!values.cantidad||!values.precio){
+        setError('Completa producto, cantidad y precio antes de agregar el detalle');return
+      }
+      setBatchItems(prev=>[...prev,{
+        producto_id:n(values.producto_id),cantidad:n(values.cantidad),
+        presentacion_id:optionalN(values.presentacion_id),
+        ...(values.presentacion_id?{}:{cantidad_base:n(values.cantidad)}),
+        precio_unitario:n(values.precio)
+      }])
+      setValues(prev=>({...prev,producto_id:'',presentacion_id:'',cantidad:'',precio:''}))
+    }
+  }
   async function submit(e:FormEvent){
     e.preventDefault();if(busy)return
     if((action==='venta'||action==='borradorVenta'||action==='division')&&selected.length===0){setError('Seleccione al menos un DIIO activo');return}
@@ -165,9 +192,9 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
       !window.confirm('Esta operación registrará cambios auditados. ¿Confirmas?'))return
     setBusy(true);setError('');setOk('')
     try{
-      const result=await callOperation(action,values,selected)
+      const result=await callOperation(action,values,selected,batchAnimals,batchItems)
       setOk('Operación registrada. Referencia: '+String(result??'confirmada'))
-      setValues({...base});setSelected([]);await refresh();onChanged()
+      setValues({...base});setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
     }catch(e){
       setError((e instanceof Error?e.message:'Error desconocido')+'. Comprueba el historial antes de repetir, por si ya se registró.')
     }finally{setBusy(false)}
@@ -182,7 +209,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
       <aside className="space-y-2">
         <h2 className="pb-2 text-sm font-semibold uppercase tracking-wider text-slate-500">Acciones</h2>
         {groups[group].filter(k=>esAdmin||S[k].role==='TODOS').map(k=>
-          <button key={k} onClick={()=>{setAction(k);setValues({...base});setSelected([]);setError('');setOk('')}}
+          <button key={k} onClick={()=>{setAction(k);setValues({...base});setSelected([]);setBatchAnimals([]);setBatchItems([]);setError('');setOk('')}}
             className={'w-full rounded-xl px-3 py-3 text-left text-sm font-medium '+(action===k?'bg-emerald-900 text-white':'text-slate-600 hover:bg-slate-50')}>{S[k].title}</button>)}
       </aside>
       <section className="space-y-4">
@@ -204,6 +231,24 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
                   disabled={busy} required={!f.optional} value={values[f.key]??(f.type==='date'?base.fecha:'')}
                   onChange={e=>setValues({...values,[f.key]:e.target.value})}/>}
             </label>)}
+          {(action==='compraAnimal'||action==='compraInsumo')&&<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-950">
+              Detalles agregados: {action==='compraAnimal'?batchAnimals.length:batchItems.length}
+            </p>
+            {(action==='compraAnimal'?batchAnimals:batchItems).map((entry,i)=>
+              <div key={i} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs">
+                <span>{String(entry.diio||entry.producto_id)} · {String(entry.precio_adquisicion||entry.precio_unitario||0)}</span>
+                <button type="button" onClick={()=>{
+                  if(action==='compraAnimal')setBatchAnimals(prev=>prev.filter((_,j)=>i!==j))
+                  else setBatchItems(prev=>prev.filter((_,j)=>i!==j))
+                }} className="font-semibold text-red-700">Quitar</button>
+              </div>)}
+            <button type="button" disabled={busy} onClick={addLine}
+              className="mt-3 rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-white">
+              + Agregar otro {action==='compraAnimal'?'ternero':'producto'}
+            </button>
+            <p className="mt-2 text-xs text-emerald-900">Al registrar se incluye también el formulario actual. Todos los detalles se guardan en una sola transacción.</p>
+          </div>}
           {(action==='venta'||action==='borradorVenta'||action==='division')&&<fieldset className="rounded-xl border border-slate-200 p-4">
             <legend className="px-2 text-sm font-semibold">Seleccionar animales ({selected.length})</legend>
             <div className="max-h-64 space-y-2 overflow-auto">

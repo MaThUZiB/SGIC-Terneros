@@ -34,6 +34,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
   const [proveedorId,setProveedorId]=useState('')
   const [documento,setDocumento]=useState('')
   const [bulk,setBulk]=useState('')
+  const [pastedPrices,setPastedPrices]=useState('')
   const [mapRaza,setMapRaza]=useState<Record<string,string>>({})
   const [lotes,setLotes]=useState<Option[]>([])
   const [razas,setRazas]=useState<Option[]>([])
@@ -89,6 +90,18 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
     if(!validPrice(bulk)){setError('Introduce un valor positivo válido (máximo dos decimales).');return}
     setRows(old=>old.map(r=>r.selected?{...r,precio:bulk}:r))
     setError('')
+  }
+  function applyPastedPrices(){
+    const values=pastedPrices.replace(/\\r/g,'').split(/\\n/).map(v=>v.trim()).filter(Boolean)
+    if(!values.length||values.length!==selected.length){
+      setError('Pega exactamente un precio por cada DIIO seleccionado, en el mismo orden de la tabla.');return
+    }
+    if(values.some(v=>!validPrice(v))){
+      setError('Los valores pegados deben ser números CLP positivos, sin separadores de miles y con máximo dos decimales.');return
+    }
+    const changes=new Map(selected.map((r,i)=>[r.diio,values[i]]))
+    setRows(old=>old.map(r=>changes.has(r.diio)?{...r,precio:changes.get(r.diio)!}:r))
+    setPastedPrices('');setError('')
   }
   function prepare(){
     setError('')
@@ -228,6 +241,14 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
           <button type="button" onClick={applyBulk} className="rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900">Aplicar a seleccionados</button>
         </div>
       </div>
+      <details className="rounded-lg border border-slate-200 bg-white p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-800">Pegar columna de precios desde Excel</summary>
+        <p className="mt-2 text-xs text-slate-600">Copia una columna de importes numéricos sin separadores de miles. Los valores se asignan en orden a los DIIO seleccionados; deben coincidir las cantidades.</p>
+        <textarea value={pastedPrices} onChange={e=>setPastedPrices(e.target.value)} rows={4}
+          aria-label="Columna de precios por DIIO" placeholder={'180000\\n195000\\n175000'}
+          className="mt-2 w-full rounded-lg border border-slate-300 p-2 font-mono text-sm"/>
+        <button type="button" onClick={applyPastedPrices} className="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Aplicar precios de columna</button>
+      </details>
       <div className="max-h-[480px] overflow-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-600">

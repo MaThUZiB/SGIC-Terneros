@@ -9,6 +9,7 @@ import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
 import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
+import { SipecSyncPreview } from './SipecSyncPreview'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -131,6 +132,9 @@ export function CloudWorkspacePage() {
   }
 
   const availableActions=getModuleActions(tab,esAdmin)
+  const visibleActions=tab==='animales'&&esAdmin
+    ? [...availableActions,{id:'sipecSync',label:'Sincronizar con SIPECweb'}]
+    : availableActions
 
   function salir() {
     logout()
@@ -182,14 +186,14 @@ export function CloudWorkspacePage() {
 
         {!error && datos && (
           <>
-            {availableActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
+            {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
                 <div>
                   <h2 className="text-sm font-semibold text-slate-900">Acciones de {moduleTitles[tab]}</h2>
                   <p className="mt-1 text-xs text-slate-500">Selecciona una acción para abrir su formulario aquí.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {availableActions.map(item=><button type="button" key={item.id}
+                  {visibleActions.map(item=><button type="button" key={item.id}
                     onClick={()=>setOperation(previous=>previous===item.id?null:item.id)}
                     aria-expanded={operation===item.id}
                     className={`rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${operation===item.id
@@ -199,7 +203,9 @@ export function CloudWorkspacePage() {
                   </button>)}
                 </div>
               </div>
-              {operation&&availableActions.some(item=>item.id===operation)&&
+              {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
+                <SipecSyncPreview onClose={()=>setOperation(null)}/>}
+              {operation&&operation!=='sipecSync'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={()=>setOperation(null)}/>}
             </section>}

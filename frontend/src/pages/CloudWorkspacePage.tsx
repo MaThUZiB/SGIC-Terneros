@@ -4,6 +4,7 @@ import { supabase } from '../api/supabase'
 import { useAuth } from '../auth/AuthContext'
 import { OperationalModules, OperationsHistory } from './OperationalModules'
 import { UserManagement } from './UserManagement'
+import { ProfitabilityReport } from './ProfitabilityReport'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -18,7 +19,7 @@ type Datos = {
   animales: Animal[]; lotes: Lote[]; productos: Producto[]
   proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]
 }
-type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras' | 'operaciones' | 'historial' | 'usuarios'
+type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras' | 'operaciones' | 'historial' | 'usuarios' | 'rentabilidad'
 
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
@@ -30,6 +31,7 @@ const tabs: { id: Pestaña; label: string }[] = [
   { id: 'operaciones', label: 'Operaciones' },
   { id: 'historial', label: 'Historial y auditoría' },
   { id: 'usuarios', label: 'Usuarios' },
+  { id: 'rentabilidad', label: 'Rentabilidad' },
 ]
 
 function Indicador({ nombre, valor, nota }: { nombre: string; valor: string; nota: string }) {
@@ -184,6 +186,7 @@ export function CloudWorkspacePage() {
             {tab === 'operaciones' && <OperationalModules esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
+            {tab === 'rentabilidad' && <ProfitabilityReport />}
             {tab === 'resumen' && (
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthContext'
 import { OperationalModules, OperationsHistory } from './OperationalModules'
 import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
+import { PlansOverview } from './PlansOverview'
+import { PendingRequests } from './PendingRequests'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -13,41 +15,47 @@ type Animal = {
 type Lote = { id: number; codigo: string; cantidad_actual: number; estado: string }
 type Producto = { id: number; nombre: string; stock_actual: number; stock_minimo: number; costo_promedio: number }
 type Proveedor = { id: number; nombre: string }
-type CompraAnimal = { id: number; fecha: string; total: number }
-type CompraInsumo = { id: number; fecha: string; total: number; estado: string; numero_documento: string | null }
+type CompraAnimal = { id: number; fecha: string; total: number; proveedor_id: number|null }
+type CompraInsumo = { id: number; proveedor_id: number; fecha: string; total: number; estado: string; numero_documento: string | null }
+type DetalleCompraAnimal = { compra_id:number; animal_id:number }
+type DetalleCompraInsumo = { compra_id:number; producto_id:number; cantidad:number; cantidad_base:number; subtotal:number }
 type Datos = {
   animales: Animal[]; lotes: Lote[]; productos: Producto[]
-  proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]
+  proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]; detalleAnimales: DetalleCompraAnimal[]; detalleInsumos: DetalleCompraInsumo[]
 }
-type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras' | 'operaciones' | 'historial' | 'usuarios' | 'rentabilidad'
+type Pestaña = 'resumen' | 'animales' | 'lotes' | 'inventario' | 'compras' | 'planes' | 'operaciones' | 'pendientes' | 'historial' | 'usuarios' | 'rentabilidad'
 
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
 const tabs: { id: Pestaña; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'animales', label: 'Animales' },
+  { id: 'lotes', label: 'Lotes' },
   { id: 'inventario', label: 'Inventario' },
   { id: 'compras', label: 'Compras' },
+  { id: 'planes', label: 'Planes de alimentación' },
   { id: 'operaciones', label: 'Operaciones' },
+  { id: 'pendientes', label: 'Solicitudes pendientes' },
   { id: 'historial', label: 'Historial y auditoría' },
   { id: 'usuarios', label: 'Usuarios' },
   { id: 'rentabilidad', label: 'Rentabilidad' },
 ]
 
-function Indicador({ nombre, valor, nota }: { nombre: string; valor: string; nota: string }) {
+function Indicador({ nombre, valor, nota, onClick }: { nombre: string; valor: string; nota: string; onClick:()=>void }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <button type="button" onClick={onClick} className="group w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500">
       <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">{nombre}</p>
       <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{valor}</p>
-      <p className="mt-2 text-xs text-slate-500">{nota}</p>
-    </div>
+      <p className="mt-2 text-xs text-slate-500">{nota} <span className="font-semibold text-emerald-700 group-hover:underline">· Ver detalle →</span></p>
+    </button>
   )
 }
 
 function Estado({ valor }: { valor: string }) {
   const activo = valor === 'ACTIVO' || valor === 'ACTIVA' || valor === 'CONFIRMADA'
+  const fallecido = valor === 'FALLECIDO'
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${activo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${activo ? 'bg-emerald-50 text-emerald-700' : fallecido ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'}`}>
       {valor}
     </span>
   )
@@ -65,6 +73,7 @@ export function CloudWorkspacePage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [buscar, setBuscar] = useState('')
+  const [filtroAnimal, setFiltroAnimal] = useState<'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'>('TODOS')
   const [revision, setRevision] = useState(0)
 
   useEffect(() => {
@@ -80,15 +89,17 @@ export function CloudWorkspacePage() {
       setCargando(true)
       setError('')
       try {
-        const [a, l, p, pr, ca, ci] = await Promise.all([
+        const [a, l, p, pr, ca, ci, da, di] = await Promise.all([
           supabase.from('animal').select('id,diio,lote_id,sexo,estado,precio_adquisicion,peso_ingreso_kg').order('diio').limit(1000),
           supabase.from('lote').select('id,codigo,cantidad_actual,estado').order('codigo').limit(500),
           supabase.from('producto').select('id,nombre,stock_actual,stock_minimo,costo_promedio').order('nombre').limit(500),
           supabase.from('proveedor').select('id,nombre').order('nombre').limit(200),
-          supabase.from('compra_animal').select('id,fecha,total').order('fecha', { ascending: false }).limit(300),
-          supabase.from('compra_insumo').select('id,fecha,total,estado,numero_documento').order('fecha', { ascending: false }).limit(300),
+          supabase.from('compra_animal').select('id,fecha,total,proveedor_id').order('fecha', { ascending: false }).limit(300),
+          supabase.from('compra_insumo').select('id,fecha,total,estado,numero_documento,proveedor_id').order('fecha', { ascending: false }).limit(300),
+          supabase.from('detalle_compra_animal').select('compra_id,animal_id').limit(1000),
+          supabase.from('detalle_compra_insumo').select('compra_id,producto_id,cantidad,cantidad_base,subtotal').limit(1000),
         ])
-        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error].find(Boolean)
+        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error, da.error, di.error].find(Boolean)
         if (fallo) throw new Error(fallo.message)
         if (vigente) {
           setDatos({
@@ -98,6 +109,8 @@ export function CloudWorkspacePage() {
             proveedores: (pr.data ?? []) as Proveedor[],
             comprasAnimal: (ca.data ?? []) as CompraAnimal[],
             comprasInsumo: (ci.data ?? []) as CompraInsumo[],
+            detalleAnimales:(da.data??[]) as DetalleCompraAnimal[],
+            detalleInsumos:(di.data??[]) as DetalleCompraInsumo[],
           })
         }
       } catch {
@@ -113,8 +126,8 @@ export function CloudWorkspacePage() {
 
   const lotesPorId = useMemo(() => new Map((datos?.lotes ?? []).map(l => [l.id, l.codigo])), [datos])
   const listaAnimales = (datos?.animales ?? []).filter(a =>
-    a.diio.toLowerCase().includes(buscar.toLowerCase()) ||
-    (lotesPorId.get(a.lote_id) ?? '').toLowerCase().includes(buscar.toLowerCase()),
+    (filtroAnimal==='TODOS'||a.estado===filtroAnimal) && (a.diio.toLowerCase().includes(buscar.toLowerCase()) ||
+    (lotesPorId.get(a.lote_id) ?? '').toLowerCase().includes(buscar.toLowerCase())),
   )
   const listaProductos = (datos?.productos ?? []).filter(p => p.nombre.toLowerCase().includes(buscar.toLowerCase()))
   const adquisiciones = (datos?.animales ?? []).reduce((s, a) => s + Number(a.precio_adquisicion), 0)
@@ -122,6 +135,11 @@ export function CloudWorkspacePage() {
   const demo = (datos?.animales ?? []).some(a => a.diio.startsWith('DEMO-'))
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
+
+  function abrirModulo(destino:Pestaña,filtro?:'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'){
+    setTab(destino);setBuscar('')
+    if(filtro)setFiltroAnimal(filtro)
+  }
 
   function salir() {
     logout()

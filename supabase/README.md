@@ -1,14 +1,19 @@
 # Supabase: esquema y control de acceso
 
-**Proyecto de desarrollo:** `rsqdtslkndgtaejkaoju` (São Paulo). Las migraciones de esta carpeta fueron ejecutadas y verificadas en ese proyecto el 12 de octubre de 2026. No se han cargado datos ganaderos reales.
+**Proyecto de desarrollo:** `rsqdtslkndgtaejkaoju` (São Paulo). Las migraciones fueron aplicadas y verificadas el 12 de octubre de 2026. Se cargaron datos de demostración ficticios; no hay datos ganaderos reales.
 
 ## Migraciones SQL (orden versionado)
 
 1. `20261012133036_initial_schema_sgic_20261012.sql`: 28 tablas, relaciones, unicidad DIIO, restricciones e historial de ventas.
 2. `20261012133041_security_baseline_sgic_20261012.sql`: 28 tablas con RLS; negocio denegado a `anon` y `authenticated`; lectura del perfil propio.
 3. `20261012133137_auth_profiles_roles_sgic_20261012.sql`: perfil automático al crear cuentas Auth, inactivo por defecto, auditoría de permisos en esquema privado.
+4. `20261012140100_sgic_readonly_active_profiles.sql`: lectura de registros para cuentas activas; solo ADMIN consulta auditoría; escrituras directas denegadas.
 
-Las marcas de versión de los archivos coinciden con el historial remoto recuperado tras la reconstrucción del entorno de desarrollo.
+Las marcas de versión de los archivos coinciden con el historial de migraciones remoto. La carpeta `seeds/` contiene exclusivamente datos opcionales para demostración, no migraciones productivas.
+
+## Datos de prueba
+
+Ver [documentación de datos sintéticos y primera cuenta administradora](./seeds/README.md). La contraseña no se guarda en este repositorio. Las compras de insumos están en borrador, por lo que la existencia de productos continúa en cero hasta implementar una operación de confirmación transaccional.
 
 ## Verificaciones ejecutadas
 

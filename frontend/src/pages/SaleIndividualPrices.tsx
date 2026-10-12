@@ -115,7 +115,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
         </label>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-semibold">Precio común CLP
-            <input type="number" min="0.01" step="0.01" value={bulk} onChange={e=>setBulk(e.target.value)}
+            <input type="text" inputMode="decimal" autoComplete="off" value={bulk} onChange={e=>setBulk(e.target.value)}
               className="mt-1 block w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"/>
           </label>
           <button type="button" onClick={applyAll} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Aplicar a seleccionados</button>
@@ -139,7 +139,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
               <td className="p-3 font-mono font-semibold">{a.diio}</td>
               <td className="p-3">{lotes.find(l=>l.id===a.lote_id)?.codigo||a.lote_id}</td>
               <td className="p-3 tabular-nums">{money(a.precio_adquisicion)}</td>
-              <td className="p-3"><input aria-label={'Precio de venta DIIO '+a.diio} type="number" min="0.01" step="0.01"
+              <td className="p-3"><input aria-label={'Precio de venta DIIO '+a.diio} type="text" inputMode="decimal" autoComplete="off"
                 disabled={!selectedSet.has(a.id)} value={prices[a.id]??''}
                 onChange={e=>setPrices(prev=>({...prev,[a.id]:e.target.value}))}
                 className={'w-40 rounded-lg border p-2 disabled:bg-slate-50 '+(selectedSet.has(a.id)&&!validPrice(prices[a.id]??'')?'border-amber-400':'border-slate-300')}/></td>

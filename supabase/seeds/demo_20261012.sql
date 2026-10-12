@@ -138,8 +138,8 @@ begin
   insert into public.detalle_compra_insumo(
     compra_id,producto_id,presentacion_id,cantidad,cantidad_base,precio_unitario,subtotal
   ) values
-    (v_compra_insumo,v_leche,v_presentacion_leche,8,200,45000,360000),
-    (v_compra_insumo,v_concentrado,v_presentacion_concentrado,10,250,16500,165000);
+    (v_compra_insumo,v_leche,v_presentacion_leche,8,200,1800,360000),
+    (v_compra_insumo,v_concentrado,v_presentacion_concentrado,10,250,660,165000);
 
   insert into public.plan_consumo(nombre,descripcion,observaciones)
      values('Plan de inicio DEMO','Referencia de alimentación; no descuenta inventario.',

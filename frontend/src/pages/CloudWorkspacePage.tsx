@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabase'
 import { useAuth } from '../auth/AuthContext'
+import { OperationalModules, OperationsHistory } from './OperationalModules'
+import { UserManagement } from './UserManagement'
+import { ProfitabilityReport } from './ProfitabilityReport'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -16,7 +19,7 @@ type Datos = {
   animales: Animal[]; lotes: Lote[]; productos: Producto[]
   proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]
 }
-type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras'
+type Pestaña = 'resumen' | 'animales' | 'inventario' | 'compras' | 'operaciones' | 'historial' | 'usuarios' | 'rentabilidad'
 
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
@@ -25,6 +28,10 @@ const tabs: { id: Pestaña; label: string }[] = [
   { id: 'animales', label: 'Animales' },
   { id: 'inventario', label: 'Inventario' },
   { id: 'compras', label: 'Compras' },
+  { id: 'operaciones', label: 'Operaciones' },
+  { id: 'historial', label: 'Historial y auditoría' },
+  { id: 'usuarios', label: 'Usuarios' },
+  { id: 'rentabilidad', label: 'Rentabilidad' },
 ]
 
 function Indicador({ nombre, valor, nota }: { nombre: string; valor: string; nota: string }) {
@@ -147,8 +154,8 @@ export function CloudWorkspacePage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Control ganadero</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
-            Consulta de existencias, lotes, compras y animales. Los cambios de stock y ventas permanecen
-            restringidos hasta habilitar sus operaciones transaccionales y auditoría.
+            Gestiona animales, lotes, compras, inventario, alimentación y ventas con autorización por roles,
+            registros de auditoría y funciones transaccionales en PostgreSQL.
           </p>
         </section>
 
@@ -159,7 +166,7 @@ export function CloudWorkspacePage() {
         )}
 
         <nav aria-label="Módulos de consulta" className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
-          {tabs.map(t => (
+          {tabs.filter(t => esAdmin || t.id !== 'usuarios').map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setBuscar('') }}
               aria-current={tab === t.id ? 'page' : undefined}
               className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'bg-emerald-900 text-white' : 'text-slate-600 hover:bg-white'}`}>
@@ -176,6 +183,10 @@ export function CloudWorkspacePage() {
 
         {!cargando && !error && datos && (
           <>
+            {tab === 'operaciones' && <OperationalModules esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
+            {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
+            {tab === 'usuarios' && esAdmin && <UserManagement />}
+            {tab === 'rentabilidad' && <ProfitabilityReport />}
             {tab === 'resumen' && (
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -269,7 +280,7 @@ export function CloudWorkspacePage() {
 
         <footer className="border-t border-slate-200 pt-5 text-xs leading-6 text-slate-500">
           SGIC-Terneros · Consultas autorizadas con Supabase Auth y RLS.
-          Las transacciones empresariales y la auditoría de escrituras aún están en desarrollo.
+          Las acciones autorizadas ejecutan funciones PostgreSQL transaccionales y registran auditoría. Verifica las operaciones antes de confirmar.
         </footer>
       </main>
     </div>

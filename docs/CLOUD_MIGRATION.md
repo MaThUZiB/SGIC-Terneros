@@ -1,6 +1,6 @@
 # Arquitectura objetivo y secuencia de migración
 
-**Estado (12/10/2026):** esquema PostgreSQL y control de roles activos en un proyecto Supabase de desarrollo; frontend con autenticación Supabase opcional y portal de transición. Los módulos de negocio Django aún no han sido migrados. No publicar como aplicación de producción.
+**Estado (12/10/2026):** React/Vite publicado en Cloudflare Pages, Supabase Auth/PostgreSQL/RLS integrados y módulos centrales implementados con RPC SQL transaccionales. En operación DEMO; no apto aún para datos empresariales reales sin auditoría de seguridad, pruebas E2E y restauración.
 
 ## Componentes
 
@@ -9,15 +9,14 @@
 - Supabase Free: PostgreSQL, Auth, RLS, Storage y funciones transaccionales.
 - Django: referencia de reglas actuales durante la transición; no ejecutable en Pages.
 
-## Flujo de datos futuro
+## Flujo de datos implementado
 
 ```mermaid
 flowchart TD
  Browser[React en Cloudflare Pages] --> Auth[Supabase Auth]
  Browser --> Data[Data API + RLS]
- Browser --> Fn[Edge Functions autenticadas]
+ Browser --> RPC[Funciones SQL RPC autorizadas]
  Data --> DB[(PostgreSQL)]
- Fn --> RPC[RPC transaccionales]
  RPC --> DB
  RPC --> Audit[Registro de auditoría]
  Audit --> DB
@@ -25,21 +24,21 @@ flowchart TD
 
 ## Configuración de Cloudflare Pages
 
-1. Conectar repositorio GitHub y seleccionar `main` tras fusionar y validar el PR.
+1. Despliegue ya vinculado a GitHub en `main`: https://sgic-terneros.pages.dev/.
 2. Root directory: `frontend`.
 3. Build command: `npm ci && npm run build`.
 4. Build output directory: `dist`.
 5. Definir `VITE_AUTH_PROVIDER=supabase`, `VITE_SUPABASE_URL` y la clave pública `VITE_SUPABASE_PUBLISHABLE_KEY`. No configurar variables privilegiadas.
 6. El archivo `frontend/public/_redirects` cubre rutas de React Router en Cloudflare Pages.
-7. En modo Supabase, únicamente el login y el portal de transición funcionan sin Django. Las páginas CRUD heredadas no se exponen en este modo. Para las operaciones antiguas debe usarse el modo Django local.
+7. En modo Supabase, las pantallas operacionales utilizan RPC auditadas y lectura protegida. Las pantallas Django históricas continúan solo en modo de desarrollo Django local.
 
-## Migración funcional por fases
+## Plan de evolución (fases ejecutadas y pendientes)
 
 1. Inventario: exportar contratos Django, modelos y reglas actuales; definir invariantes de DIIO, stock, PMP y costos.
 2. Datos: crear migraciones versionadas en `supabase/migrations`; restricciones SQL, FK, índices y política RLS deny-by-default.
 3. Identidad: integrar Supabase Auth y autorización por roles verificados del servidor.
-4. Transacciones: implementar compra de animales, compra insumos, consumos, división de lotes, fallecimiento, ventas y auditoría con RPC atómicas, validación de actor y control de concurrencia.
-5. UI: sustituir gradualmente axios/Django y el contexto de autenticación por clientes Supabase sin conservar tokens Django en localStorage.
+4. **Implementado:** RPC transaccionales de compras, ganadería, stock/PMP, alimentación, sanidad, gastos, ventas con DIIO explícitos, roles y auditoría; pendientes pruebas de concurrencia real y política de reversión.
+5. **Implementado:** portal cloud React conectado a Supabase para consultas, formularios transaccionales, historial, reportes y usuarios; la implementación Django se conserva aislada como legado.
 6. Calidad: pruebas RLS, privilegios, integridad, reversas y conflictos concurrentes; pruebas visuales y responsivas.
 7. Operación: exportaciones cifradas, restauración ensayada, pausas del plan Free, monitoreo y decisión de continuidad.
 
@@ -60,3 +59,7 @@ flowchart TD
 - Cambios de rol/estado generan auditoría y solo el perfil propio es visible por RLS.
 - React usa el SDK oficial de Supabase con versión bloqueada; ingreso con correo/contraseña, validación de sesión y perfil. Las rutas empresariales Django quedan excluidas del modo Supabase.
 - Ver [procedimiento operativo](../supabase/README.md) para alta de administrador e instrucciones de validación.
+
+## Manual actualizado
+
+Consultar [procesos operativos, límites y pruebas](./OPERACIONES_SUPABASE.md). No confundir una compilación correcta con pruebas E2E autenticadas ni con certificación para datos empresariales reales.

@@ -11,6 +11,7 @@ import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
 import { SipecSyncPreview } from './SipecSyncPreview'
 import { SaleIndividualPrices } from './SaleIndividualPrices'
+import { MatusFooter } from '../components/MatusFooter'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -148,7 +149,7 @@ export function CloudWorkspacePage() {
     <div className="min-h-screen bg-[#f4f7f6] text-slate-900 lg:flex">
       <SidebarNavigation current={tab} esAdmin={esAdmin} open={menuOpen}
         onClose={()=>setMenuOpen(false)} onNavigate={abrirModulo}/>
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-7 lg:px-9">
             <div className="flex min-w-0 items-center gap-3">
@@ -173,7 +174,7 @@ export function CloudWorkspacePage() {
             </div>
           </div>
         </header>
-        <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 sm:px-7 lg:px-9 lg:py-8">
+        <main className="mx-auto w-full max-w-[1440px] flex-1 space-y-5 px-4 py-6 sm:px-7 lg:px-9 lg:py-8">
           {tab==='resumen'&&<section className="rounded-3xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-7 text-white shadow-lg sm:px-9">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Control ganadero</h2>
@@ -353,11 +354,8 @@ export function CloudWorkspacePage() {
           </>
         )}
 
-        <footer className="border-t border-slate-200 pt-5 text-xs leading-6 text-slate-500">
-          SGIC-Terneros · Consultas autorizadas con Supabase Auth y RLS.
-          Las acciones autorizadas ejecutan funciones PostgreSQL transaccionales y registran auditoría. Verifica las operaciones antes de confirmar.
-        </footer>
         </main>
+        <MatusFooter />
       </div>
     </div>
   )

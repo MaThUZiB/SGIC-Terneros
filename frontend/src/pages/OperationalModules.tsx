@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../api/supabase'
 
-type Opt = { id: number; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; total?: number; numero_documento?: string | null }
+type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; total?: number; numero_documento?: string | null }
 type Lists = Record<string, Opt[]>
 type Field = { key: string; label: string; source?: string; type?: string; optional?: boolean }
 type Spec = { title: string; role: 'ADMIN' | 'TODOS'; fields: Field[]; help: string }
@@ -186,7 +186,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
             <legend className="px-2 text-sm font-semibold">Seleccionar animales ({selected.length})</legend>
             <div className="max-h-64 space-y-2 overflow-auto">
               {candidates.map(o=><label key={o.id} className="flex items-center gap-3 rounded-lg p-2 text-sm hover:bg-slate-50">
-                <input type="checkbox" checked={selected.includes(o.id)} onChange={e=>setSelected(e.target.checked?[...selected,o.id]:selected.filter(x=>x!==o.id))}/>
+                <input type="checkbox" checked={selected.includes(Number(o.id))} onChange={e=>setSelected(e.target.checked?[...selected,Number(o.id)]:selected.filter(x=>x!==Number(o.id)))}/>
                 <span>{o.diio}</span><span className="ml-auto text-xs text-slate-500">Lote {o.lote_id}</span>
               </label>)}
             </div>

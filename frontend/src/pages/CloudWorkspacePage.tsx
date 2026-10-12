@@ -27,20 +27,6 @@ type Datos = {
 }
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
-const tabs: { id: Pestaña; label: string }[] = [
-  { id: 'resumen', label: 'Resumen' },
-  { id: 'animales', label: 'Animales' },
-  { id: 'lotes', label: 'Lotes' },
-  { id: 'inventario', label: 'Inventario' },
-  { id: 'compras', label: 'Compras' },
-  { id: 'planes', label: 'Planes de alimentación' },
-  { id: 'operaciones', label: 'Operaciones' },
-  { id: 'pendientes', label: 'Solicitudes pendientes' },
-  { id: 'historial', label: 'Historial y auditoría' },
-  { id: 'usuarios', label: 'Usuarios' },
-  { id: 'rentabilidad', label: 'Rentabilidad' },
-]
-
 function Indicador({ nombre, valor, nota, onClick }: { nombre: string; valor: string; nota: string; onClick:()=>void }) {
   return (
     <button type="button" onClick={onClick} className="group w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500">

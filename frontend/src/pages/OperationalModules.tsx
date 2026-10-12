@@ -20,6 +20,9 @@ const S: Record<string, Spec> = {
   consumo: {title:'Alimentación / consumo real',role:'TODOS',help:'Descuenta stock al PMP actual y registra su costo por lote.',fields:[F('lote_id','Lote','lote'),F('producto_id','Producto','producto'),F('cantidad','Cantidad (unidad base)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
   tratamiento: {title:'Tratamiento sanitario',role:'TODOS',help:'Imputa al animal el costo del producto descontado desde inventario.',fields:[F('animal_id','DIIO','animal'),F('producto_id','Producto sanitario','producto'),F('cantidad','Cantidad (unidad base)',undefined,'number'),F('motivo','Motivo'),F('fecha','Fecha',undefined,'date')]},
   gasto: {title:'Registrar gasto',role:'ADMIN',help:'Asocia gastos al lote o registra un gasto general.',fields:[F('categoria_id','Categoría','categoria_gasto'),F('lote_id','Lote (opcional)','lote',undefined,true),F('nombre','Concepto'),F('monto','Monto (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
+  borradorVenta:{title:'Preparar venta (borrador)',role:'ADMIN',help:'Selecciona los DIIO y el valor de venta sin cambiar sus estados. Puedes confirmar o anular más adelante.',fields:[F('comprador','Comprador',undefined,'text',true),F('total','Monto venta (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
+  confirmarVenta:{title:'Confirmar venta borrador',role:'ADMIN',help:'Congela el ingreso, los costos y los animales seleccionados. Es una operación irreversible.',fields:[F('venta_id','Borrador pendiente','venta')]},
+  anularVenta:{title:'Anular venta borrador',role:'ADMIN',help:'Anula el borrador sin modificar el estado de los animales.',fields:[F('venta_id','Borrador pendiente','venta')]},
   venta: {title:'Confirmar venta por DIIO',role:'ADMIN',help:'Selecciona los animales exactos y registra ingreso y costos reconocidos. No se puede deshacer una venta confirmada.',fields:[F('comprador','Comprador',undefined,'text',true),F('total','Monto de venta (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
   planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'La cantidad se expresa en la unidad base del producto.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria',undefined,'number')]},
   consumoPlan:{title:'Ejecutar consumo desde plan',role:'TODOS',help:'Aplica el plan diario, descuenta stock y evita repetirlo en la misma fecha.',fields:[F('asignacion_id','Asignación vigente','asignacion_plan_lote'),F('fecha','Fecha',undefined,'date')]},
@@ -30,7 +33,7 @@ const groups: Record<string, string[]> = {
   Ganadería:['compraAnimal','peso','fallecimiento','division'],
   Inventario:['compraInsumo','confirmar','anular','ajuste'],
   Producción:['consumo','consumoPlan','tratamiento','planDetalle','asignarPlan'],
-  Finanzas:['venta','gasto'],
+  Finanzas:['borradorVenta','confirmarVenta','anularVenta','venta','gasto'],
   Catálogos:['catalogo'],
 }
 const catalogs = [
@@ -47,6 +50,7 @@ function label(o: Opt, source: string) {
   if(source==='animal') return o.diio || String(o.id)
   if(source==='lote') return o.codigo || String(o.id)
   if(source==='asignacion_plan_lote') return 'Asignación #' + o.id + ' · lote ' + String(o.lote_id)
+  if(source==='venta') return 'Venta #' + o.id
   if(source==='compra') return '#' + o.id + ' · ' + (o.numero_documento || 'Borrador') + ' · ' + String(o.total)
   return o.nombre || o.codigo || String(o.id)
 }
@@ -87,6 +91,9 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'consumo':method='sgic_registrar_consumo';params={p_lote_id:n(v.lote_id),p_producto_id:n(v.producto_id),p_cantidad:n(v.cantidad),p_fecha:v.fecha};break
     case 'tratamiento':method='sgic_registrar_tratamiento';params={p_animal_id:n(v.animal_id),p_producto_id:n(v.producto_id),p_cantidad:n(v.cantidad),p_motivo:v.motivo,p_fecha:v.fecha};break
     case 'gasto':method='sgic_registrar_gasto';params={p_categoria_id:n(v.categoria_id),p_lote_id:optionalN(v.lote_id),p_nombre:v.nombre,p_monto:n(v.monto),p_fecha:v.fecha};break
+    case 'borradorVenta':method='sgic_borrador_venta';params={p_animal_ids:selected,p_total:n(v.total),p_comprador:v.comprador||'',p_fecha:v.fecha};break
+    case 'confirmarVenta':method='sgic_confirmar_borrador_venta';params={p_venta_id:n(v.venta_id)};break
+    case 'anularVenta':method='sgic_anular_borrador_venta';params={p_venta_id:n(v.venta_id)};break
     case 'venta':method='sgic_confirmar_venta';params={p_animal_ids:selected,p_total:n(v.total),p_comprador:v.comprador||'',p_fecha:v.fecha};break
     case 'planDetalle':method='sgic_plan_detalle';params={p_plan_id:n(v.plan_id),p_producto_id:n(v.producto_id),p_cantidad_diaria:n(v.cantidad)};break
     case 'consumoPlan':method='sgic_consumo_desde_plan';params={p_asignacion_id:n(v.asignacion_id),p_fecha:v.fecha};break
@@ -110,7 +117,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   async function refresh(){
     if(!supabase)return
     setLoading(true)
-    const keys=['animal','lote','raza','proveedor','producto','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo','asignacion_plan_lote']
+    const keys=['animal','lote','raza','proveedor','producto','venta','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo','asignacion_plan_lote']
     const results=await Promise.all(keys.map(k=>supabase!.from(k).select('*').order('id',{ascending:true}).limit(1000)))
     const next:Lists={}
     results.forEach((r,i)=>{next[keys[i]==='compra_insumo'?'compra':keys[i]]=(r.data||[]) as Opt[]})
@@ -135,15 +142,15 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     if(source==='tipo')return catalogs
     if(source==='sexo')return [{id:'MACHO',nombre:'Macho'},{id:'HEMBRA',nombre:'Hembra'}]
     const arr=lists[source]||[]
-    if(source==='compra')return arr.filter(o=>o.estado==='BORRADOR')
+    if(source==='compra'||source==='venta')return arr.filter(o=>o.estado==='BORRADOR')
     if(source==='asignacion_plan_lote')return arr.filter(o=>o.activo!==false)
     if(source==='lote'||source==='animal')return arr.filter(o=>o.estado==='ACTIVO')
     return arr.filter(o=>o.activo!==false)
   }
   async function submit(e:FormEvent){
     e.preventDefault();if(busy)return
-    if((action==='venta'||action==='division')&&selected.length===0){setError('Seleccione al menos un DIIO activo');return}
-    if(['venta','fallecimiento','confirmar','ajuste'].includes(action)&&
+    if((action==='venta'||action==='borradorVenta'||action==='division')&&selected.length===0){setError('Seleccione al menos un DIIO activo');return}
+    if(['venta','confirmarVenta','fallecimiento','confirmar','ajuste'].includes(action)&&
       !window.confirm('Esta operación registrará cambios auditados. ¿Confirmas?'))return
     setBusy(true);setError('');setOk('')
     try{

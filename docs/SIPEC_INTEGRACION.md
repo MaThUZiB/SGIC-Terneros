@@ -38,7 +38,7 @@ Una vez comprobados los resultados:
 4. Revisar la fecha de incorporación y el documento de referencia opcional (FMA, folio o documento interno).
 5. Para una compra, seleccionar proveedor si se dispone de él.
 6. Homologar cada raza SAG con el catálogo de SGIC. Se puede escoger una raza existente o registrar la raza SAG como nueva dentro de la misma transacción.
-7. En la tabla editable, seleccionar los DIIO y completar su **valor base (CLP)** uno a uno. Es posible aplicar un valor común o pegar una columna de precios en el orden visible de la selección (sin separadores de miles).
+7. En la tabla editable, seleccionar los DIIO y completar su **valor base (CLP)** uno a uno. Es posible aplicar un valor común o pegar una columna de precios en el orden visible de la selección. Los campos monetarios son de escritura directa (sin flechas ni incrementos con la rueda del ratón); admiten importes como `180000`, `180.000` y `180.000,50`.
 8. Revisar el número de animales, valor total, lote y tipo de ingreso.
 9. Pulsar **Revisar y confirmar incorporación** y aceptar el diálogo final.
 10. Comprobar el resultado en Animales y en el historial. Solo los DIIO seleccionados y confirmados pasan a formar parte de SGIC.

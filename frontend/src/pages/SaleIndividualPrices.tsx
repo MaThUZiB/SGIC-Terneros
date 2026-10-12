@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../api/supabase'
+import { parseClpAmount } from '../utils/clpInput'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 
 type Animal = {id:number;diio:string;lote_id:number;precio_adquisicion:number}
@@ -7,7 +8,7 @@ type Lote = {id:number;codigo:string}
 type PriceMap = Record<number,string>
 const money=(v:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:2}).format(v)
 const dateNow=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
-function validPrice(v:string){const n=Number(v);return v.trim()!=='' && Number.isFinite(n) && n>0 && n<=9999999999.99 && /^\d+(?:\.\d{1,2})?$/.test(v.trim())}
+function validPrice(v:string){return parseClpAmount(v)!==null}
 const PAGE=500
 export function SaleIndividualPrices({onClose,onChanged}:{
   onClose:()=>void;onChanged:()=>void
@@ -48,7 +49,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
 
   const selectedSet=useMemo(()=>new Set(selected),[selected])
   const selectedAnimals=useMemo(()=>animales.filter(a=>selectedSet.has(a.id)),[animales,selectedSet])
-  const total=selectedAnimals.reduce((sum,a)=>sum+(validPrice(prices[a.id]??'')?Math.round(Number(prices[a.id])*100):0),0)/100
+  const total=selectedAnimals.reduce((sum,a)=>sum+(validPrice(prices[a.id]??'')?Math.round((parseClpAmount(prices[a.id]??'')??0)*100):0),0)/100
   const missing=selectedAnimals.filter(a=>!validPrice(prices[a.id]??''))
   const shown=animales.filter(a=>a.diio.toLowerCase().includes(search.trim().toLowerCase())||
     (lotes.find(l=>l.id===a.lote_id)?.codigo??'').toLowerCase().includes(search.trim().toLowerCase()))
@@ -77,7 +78,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
     setBusy(true);setError('')
     try{
       const result=await supabase.rpc('sgic_venta_precios_individuales',{
-        p_animales:selectedAnimals.map(a=>({animal_id:a.id,precio_venta:Number(prices[a.id])})),
+        p_animales:selectedAnimals.map(a=>({animal_id:a.id,precio_venta:parseClpAmount(prices[a.id]??'')})),
         p_comprador:comprador,p_fecha:fecha,
       })
       if(result.error)throw Error(result.error.message)
@@ -92,7 +93,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
   return <section aria-label="Venta con precios individuales" className="space-y-5 rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-xl font-semibold">Venta con precios por DIIO</h2>
-        <p className="mt-1 text-sm text-slate-600">Selecciona animales activos y asigna un precio de venta a cada uno.</p></div>
+        <p className="mt-1 text-sm text-slate-600">Selecciona animales activos y asigna un precio de venta a cada uno. Puedes escribir 180000 o 180.000 CLP.</p></div>
       <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold disabled:opacity-50">Cerrar</button>
     </div>
     {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -115,7 +116,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
         </label>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-semibold">Precio común CLP
-            <input type="number" min="0.01" step="0.01" value={bulk} onChange={e=>setBulk(e.target.value)}
+            <input type="text" inputMode="decimal" autoComplete="off" value={bulk} onChange={e=>setBulk(e.target.value)}
               className="mt-1 block w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"/>
           </label>
           <button type="button" onClick={applyAll} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Aplicar a seleccionados</button>
@@ -139,7 +140,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
               <td className="p-3 font-mono font-semibold">{a.diio}</td>
               <td className="p-3">{lotes.find(l=>l.id===a.lote_id)?.codigo||a.lote_id}</td>
               <td className="p-3 tabular-nums">{money(a.precio_adquisicion)}</td>
-              <td className="p-3"><input aria-label={'Precio de venta DIIO '+a.diio} type="number" min="0.01" step="0.01"
+              <td className="p-3"><input aria-label={'Precio de venta DIIO '+a.diio} type="text" inputMode="decimal" autoComplete="off"
                 disabled={!selectedSet.has(a.id)} value={prices[a.id]??''}
                 onChange={e=>setPrices(prev=>({...prev,[a.id]:e.target.value}))}
                 className={'w-40 rounded-lg border p-2 disabled:bg-slate-50 '+(selectedSet.has(a.id)&&!validPrice(prices[a.id]??'')?'border-amber-400':'border-slate-300')}/></td>

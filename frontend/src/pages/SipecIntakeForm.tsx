@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../api/supabase'
+import { parseClpAmount } from '../utils/clpInput'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import type { SipecAnimal } from '../utils/sipecSpreadsheet'
 
@@ -14,11 +15,7 @@ const localDate = () => {
   return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')
 }
 const MAX_BATCH=200
-function validPrice(value:string):boolean{
-  const n=Number(value)
-  return value.trim()!=='' && Number.isFinite(n) && n>0 && n<=9999999999.99 &&
-    /^\d+(?:\.\d{1,2})?$/.test(value.trim())
-}
+function validPrice(value:string):boolean{return parseClpAmount(value)!==null}
 function normalize(value:string):string{
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()
 }
@@ -75,7 +72,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
   },[animales])
 
   const selected=useMemo(()=>rows.filter(r=>r.selected),[rows])
-  const selectedTotal=useMemo(()=>selected.reduce((sum,r)=>sum+(validPrice(r.precio)?Math.round(Number(r.precio)*100):0),0)/100,[selected])
+  const selectedTotal=useMemo(()=>selected.reduce((sum,r)=>sum+(validPrice(r.precio)?Math.round((parseClpAmount(r.precio)??0)*100):0),0)/100,[selected])
   const missing=selected.filter(r=>!validPrice(r.precio))
   const distinctRazas=useMemo(()=>[...new Set(rows.map(r=>r.raza))],[rows])
   const labels:Record<IncomeType,string>={
@@ -97,7 +94,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
       setError('Pega exactamente un precio por cada DIIO seleccionado, en el mismo orden de la tabla.');return
     }
     if(values.some(v=>!validPrice(v))){
-      setError('Los valores pegados deben ser números CLP positivos, sin separadores de miles y con máximo dos decimales.');return
+      setError('Los importes deben ser positivos. Admite 180000, 180.000 o 180.000,50.');return
     }
     const changes=new Map(selected.map((r,i)=>[r.diio,values[i]]))
     setRows(old=>old.map(r=>changes.has(r.diio)?{...r,precio:changes.get(r.diio)!}:r))
@@ -152,7 +149,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
           raza_nombre:r.raza,
           raza_sipec:r.raza,categoria_sipec:r.categoria,
           establecimiento_sipec:r.establecimiento,
-          valor_base:Number(r.precio),
+          valor_base:parseClpAmount(r.precio),
         })),
       }
       const result=await supabase.rpc('sgic_incorporar_desde_sipec',params)
@@ -231,11 +228,12 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h4 className="font-semibold text-slate-900">Tabla de valorización</h4>
+          <p className="text-xs text-slate-500">Escribe 180000 o 180.000; el punto separa miles y la coma indica decimales.</p>
           <p className="text-xs text-slate-600">Seleccionados: {selected.length} / {rows.length} · Sin valor válido: {missing.length}</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs font-semibold">Precio común (CLP)
-            <input type="number" min="0.01" step="0.01" value={bulk} onChange={e=>setBulk(e.target.value)}
+            <input type="text" inputMode="decimal" autoComplete="off" value={bulk} onChange={e=>setBulk(e.target.value)}
               className="mt-1 block w-36 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"/>
           </label>
           <button type="button" onClick={applyBulk} className="rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900">Aplicar a seleccionados</button>
@@ -243,7 +241,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
       </div>
       <details className="rounded-lg border border-slate-200 bg-white p-3">
         <summary className="cursor-pointer text-sm font-semibold text-slate-800">Pegar columna de precios desde Excel</summary>
-        <p className="mt-2 text-xs text-slate-600">Copia una columna de importes numéricos sin separadores de miles. Los valores se asignan en orden a los DIIO seleccionados; deben coincidir las cantidades.</p>
+        <p className="mt-2 text-xs text-slate-600">Copia una columna de importes CLP (por ejemplo 180000 o 180.000). Los valores se asignan en orden a los DIIO seleccionados; deben coincidir las cantidades.</p>
         <textarea value={pastedPrices} onChange={e=>setPastedPrices(e.target.value)} rows={4}
           aria-label="Columna de precios por DIIO" placeholder={'180000\n195000\n175000'}
           className="mt-2 w-full rounded-lg border border-slate-300 p-2 font-mono text-sm"/>
@@ -267,7 +265,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
               <td className="p-3">{r.raza}</td>
               <td className="p-3">{r.sexo}</td>
               <td className="p-3">{r.fechaNacimiento||'—'}</td>
-              <td className="p-3"><input type="number" min="0.01" max="9999999999.99" step="0.01"
+              <td className="p-3"><input type="text" inputMode="decimal" autoComplete="off"
                 aria-label={'Valor base DIIO '+r.diio} disabled={!r.selected}
                 value={r.precio} onChange={e=>updateRow(r.diio,{precio:e.target.value})}
                 className={'w-36 rounded-lg border p-2 disabled:bg-slate-100 '+(r.selected&&!validPrice(r.precio)?'border-amber-400':'border-slate-300')}/></td>

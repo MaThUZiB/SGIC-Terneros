@@ -55,7 +55,7 @@ const money=(v:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency
 const round2=(v:number)=>Math.round((v+Number.EPSILON)*100)/100
 function purchaseLine(v:Record<string,string>,lists:Lists):Record<string,unknown>|null {
   if(!v.producto_id&&!v.cantidad&&!v.precio&&!v.presentacion_id)return null
-  const cantidad=Number(v.cantidad),precio=Number(v.precio)
+  const cantidad=n(v.cantidad),precio=n(v.precio)
   if(!v.producto_id||!v.cantidad||!v.precio||!Number.isFinite(cantidad)||cantidad<=0||!Number.isFinite(precio)||precio<=0)
     throw Error('Completa producto, cantidad positiva y precio válido.')
   const pack=v.presentacion_id?(lists.presentacion_producto||[]).find(x=>String(x.id)===v.presentacion_id):undefined

@@ -47,7 +47,7 @@ const contextualActions: Partial<Record<ModuleId,string[]>> = {
   catalogos:['catalogo'],
 }
 const contextualLabels:Record<string,string>={
-  compraAnimal:'Comprar animales',peso:'Registrar pesaje',fallecimiento:'Fallecimiento',
+  compraAnimal:'Compra manual de animales',peso:'Registrar pesaje',fallecimiento:'Fallecimiento',
   animalRectificar:'Rectificar',division:'Dividir lote',compraInsumo:'Comprar insumos',
   ajuste:'Ajustar stock',presentacion:'Crear presentación',conversion:'Crear conversión',
   productoEditar:'Editar producto',catalogo:'Crear nuevo registro',

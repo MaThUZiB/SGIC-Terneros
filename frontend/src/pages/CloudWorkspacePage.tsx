@@ -10,6 +10,7 @@ import { ProfitabilityReport } from './ProfitabilityReport'
 import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
 import { SipecSyncPreview } from './SipecSyncPreview'
+import { SaleIndividualPrices } from './SaleIndividualPrices'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -133,8 +134,10 @@ export function CloudWorkspacePage() {
 
   const availableActions=getModuleActions(tab,esAdmin)
   const visibleActions=tab==='animales'&&esAdmin
-    ? [...availableActions,{id:'sipecSync',label:'Sincronizar con SIPECweb'}]
-    : availableActions
+    ? [{id:'sipecSync',label:'Sincronizar con SIPECweb'},...availableActions]
+    : tab==='ventas'&&esAdmin
+      ? [...availableActions,{id:'ventaIndividual',label:'Venta con precios por DIIO'}]
+      : availableActions
 
   function salir() {
     logout()
@@ -204,8 +207,10 @@ export function CloudWorkspacePage() {
                 </div>
               </div>
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
-                <SipecSyncPreview onClose={()=>setOperation(null)}/>}
-              {operation&&operation!=='sipecSync'&&availableActions.some(item=>item.id===operation)&&
+                <SipecSyncPreview onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+              {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
+                <SaleIndividualPrices onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+              {operation&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={()=>setOperation(null)}/>}
             </section>}
@@ -224,7 +229,7 @@ export function CloudWorkspacePage() {
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
                   <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
-                  <Indicador nombre="Adquisiciones" valor={formatoDinero(adquisiciones)} nota="Suma de precios de los animales registrados" onClick={()=>abrirModulo("compras")} />
+                  <Indicador nombre="Valor base del ganado" valor={formatoDinero(adquisiciones)} nota="Suma del valor inicial asignado a los animales" onClick={()=>abrirModulo("compras")} />
                   <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
                 </div>
                 <div className="grid gap-5 lg:grid-cols-2">

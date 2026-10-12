@@ -13,7 +13,7 @@ Establecer verificaciones para mantener SGIC-Terneros disponible y consistente d
 - Kardex con entradas, salidas y ajustes; existencias y PMP en la tabla de productos.
 - Trazabilidad de acciones y cambios de perfil en `registro_auditoria`.
 - GitHub Actions: `npm run test:sipec`, `npm run build` y `npm audit --omit=dev --audit-level=high`.
-- El lector SIPECweb no modifica registros ni almacena el archivo.
+- La previsualización SIPECweb no modifica registros; la incorporación requiere una segunda acción con precios, lote y confirmación explícita. Las RPC imponen ADMIN, unicidad DIIO y atomicidad.
 
 ## 3. Checklist de puesta en servicio y revisiones periódicas
 
@@ -68,7 +68,7 @@ Establecer verificaciones para mantener SGIC-Terneros disponible y consistente d
 
 ## 6. Mejoras pendientes
 
-- Incorporación definitiva de DIIO desde SIPECweb con aprobación, lote y costo validado; **no implementada**.
+- Ampliar pruebas E2E del asistente de incorporación SIPECweb y de ventas por DIIO con usuario ADMIN real; la compilación y prueba SQL revertida no sustituyen la aceptación en navegador.
 - Sincronización directa con SIPECweb: **no implementada** y condicionada a un mecanismo autorizado por el SAG.
 - Pruebas E2E automatizadas de navegador, recuperación completa y concurrencia real ampliada.
 - Automatización de respaldos y comprobación programada de restauración.

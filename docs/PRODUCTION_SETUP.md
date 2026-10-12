@@ -8,7 +8,7 @@
 - **Identidad:** Supabase Auth por correo y contraseña.
 - **Autorización:** tabla `public.perfil` con `rol` (`ADMIN` o `OPERADOR`) y `activo`.
 
-La base utiliza las 14 migraciones SQL disponibles en `supabase/migrations/`. No ejecutar scripts de datos de ejemplo en producción.
+La base utiliza las 15 migraciones SQL disponibles en `supabase/migrations/`. No ejecutar scripts de datos de ejemplo en producción.
 
 ## 2. Inicio de sesión
 
@@ -69,7 +69,7 @@ Evitar compartir cuentas: cada integrante debe utilizar credenciales propias.
 - El botón **Actualizar** vuelve a consultar los datos de la pantalla y no modifica registros.
 - Compras confirmadas crean movimientos de inventario; borradores no lo hacen.
 - Un animal vendido o fallecido conserva su historial y deja de contarse como activo.
-- **Animales → Sincronizar con SIPECweb** permite revisar diferencias con un `.xls` exportado por SAG en modo **solo lectura**.
+- **Animales → Sincronizar con SIPECweb** permite comparar el XLS del SAG sin cambios y, mediante una segunda acción confirmada, registrar nuevos DIIO con tipo, lote, raza y valorización. **Ventas → Venta con precios por DIIO** registra importes individuales. Ninguna incorporación se produce al solo seleccionar el XLS.
 
 ## 7. Seguridad y respaldo
 

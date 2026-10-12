@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type ChangeEvent } from 'react'
 import { supabase } from '../api/supabase'
+import { SipecIntakeForm } from './SipecIntakeForm'
 import { parseSipecSpreadsheetXml, type SipecAnimal, type SipecReport } from '../utils/sipecSpreadsheet'
 
 type Existing = { diio: string; estado: string }
@@ -51,7 +52,7 @@ function SummaryCard({title,value,tone,onClick,selected}:{
   </button>
 }
 
-export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
+export function SipecSyncPreview({onClose,onChanged}:{onClose:()=>void;onChanged:()=>void}) {
   const inputId = useId()
   const [report,setReport] = useState<SipecReport|null>(null)
   const [filename,setFilename] = useState('')
@@ -59,6 +60,8 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [filter,setFilter] = useState<Filter>('nuevos')
+  const [incorporando,setIncorporando] = useState(false)
+  const [success,setSuccess] = useState('')
 
   const comparison = useMemo(()=>{
     const byDiio = new Map(existing.map(item=>[item.diio,item]))
@@ -83,7 +86,7 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value=''
     if (!file || busy) return
-    setReport(null);setExisting([]);setFilename('');setError('');setBusy(true)
+    setReport(null);setExisting([]);setFilename('');setError('');setSuccess('');setIncorporando(false);setBusy(true)
     try {
       const parsed = await readSipecExport(file)
       const registered = await readRegisteredAnimals()
@@ -99,7 +102,15 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
   }
 
   function reset(){
-    setReport(null);setExisting([]);setFilename('');setError('');setFilter('nuevos')
+    setReport(null);setExisting([]);setFilename('');setError('');setFilter('nuevos');setSuccess('');setIncorporando(false)
+  }
+
+  async function afterIncorporate(id:number){
+    setIncorporando(false)
+    setSuccess('Ingreso SIPECweb #'+id+' confirmado. La operación ya está registrada en Supabase.')
+    onChanged()
+    try {setExisting(await readRegisteredAnimals())} catch (e) {setError(e instanceof Error?e.message:'No fue posible actualizar el inventario.')}
+    setFilter('existentes')
   }
 
   return <section aria-label="Sincronizar con SIPECweb" className="space-y-5 rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
@@ -112,22 +123,22 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
           Compara sus DIIO con el registro de SGIC y revisa las diferencias.
         </p>
       </div>
-      <button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar sincronización" title="Cerrar"
+      <button type="button" onClick={onClose} disabled={busy||incorporando} aria-label="Cerrar sincronización" title="Cerrar"
         className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50">
         <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
 
     <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
-      <strong>Modo de prueba — solo lectura.</strong> No se importan, crean, venden, eliminan ni modifican animales.
-      El archivo se analiza en tu navegador; SGIC solo consulta los DIIO registrados para comparar.
-      Al cerrar esta vista se descarta la previsualización.
+      <strong>Conciliación y registro supervisado.</strong> La carga del XLS solo lee y compara los DIIO; no modifica animales.
+      Si decides incorporar nuevos DIIO, deberás completar y revisar sus valores económicos y confirmar expresamente la operación.
+      El archivo se procesa en el navegador y no se almacena en Supabase.
     </div>
 
     <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
       <label htmlFor={inputId} className="mb-3 block text-sm font-semibold text-slate-800">Exportación de SIPECweb</label>
       <input id={inputId} type="file" accept=".xls,.xml,application/vnd.ms-excel,application/xml,text/xml"
-        onChange={event=>{void selectFile(event)}} disabled={busy}
+        onChange={event=>{void selectFile(event)}} disabled={busy||incorporando}
         className="block w-full max-w-lg text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-800 file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-emerald-900 disabled:opacity-50"/>
       <p className="mt-3 text-xs leading-5 text-slate-500">
         Acepta el .xls de SIPECweb (Excel XML 2003); no el PDF de «Imprimir animales presentes».
@@ -137,11 +148,12 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
 
     {busy&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">Leyendo exportación y comparando DIIO registrados…</p>}
     {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{error}</p>}
+    {success&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">{success}</p>}
 
     {report&&<div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="break-all text-sm text-slate-600"><strong>Archivo revisado:</strong> {filename} · {report.filasLeidas} filas examinadas</p>
-        <button type="button" onClick={reset} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Elegir otro archivo</button>
+        <button type="button" onClick={reset} disabled={incorporando} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Elegir otro archivo</button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -154,6 +166,13 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
         <SummaryCard title="Total DIIO válidos" value={report.animales.length} tone="blue"
           onClick={()=>setFilter('todos')} selected={filter==='todos'}/>
       </div>
+
+      {comparison.nuevos.length>0&&!incorporando&&<button type="button" onClick={()=>setIncorporando(true)}
+        className="rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-900">
+        Incorporar DIIO nuevos con valorización ({comparison.nuevos.length})
+      </button>}
+      {incorporando&&<SipecIntakeForm animales={comparison.nuevos} onCancel={()=>setIncorporando(false)}
+        onSuccess={id=>{void afterIncorporate(id)}}/>}
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <strong>Importante:</strong> este listado es una fotografía, no una constancia de traspaso.
@@ -202,8 +221,8 @@ export function SipecSyncPreview({onClose}:{onClose:()=>void}) {
         </div>
       </div>
       <p className="text-xs leading-5 text-slate-500">
-        Esta previsualización no equivale a una importación de compras ni genera cambios en Supabase.
-        La incorporación definitiva requerirá confirmar lote, fecha, raza homologada y tratamiento del costo de adquisición.
+        La vista de comparación no escribe datos. Solo el formulario de incorporación, tras la confirmación explícita,
+        registra animales con tipo de ingreso, lote, fecha y valorización. Una compra solo se genera cuando el tipo es Compra.
       </p>
     </div>}
   </section>

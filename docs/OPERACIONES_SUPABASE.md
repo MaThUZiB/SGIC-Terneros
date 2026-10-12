@@ -17,7 +17,7 @@ En escritorio la navegación es lateral fija; en pantallas pequeñas se abre des
 
 ## 2. Roles de acceso
 
-- **Administrador (ADMIN):** crea catálogos, registra compras de animales e insumos, bajas, divisiones, ajustes, rectificaciones, gastos y ventas; autoriza solicitudes y usuarios; revisa SIPECweb.
+- **Administrador (ADMIN):** crea catálogos, registra compras de animales e insumos, bajas, divisiones, ajustes, rectificaciones, gastos y ventas; autoriza solicitudes y usuarios; compara exportaciones SIPECweb e incorpora animales supervisadamente.
 - **Operador (OPERADOR):** registra pesajes, consumos manuales o desde plan y tratamientos sanitarios; consulta registros permitidos.
 - Las funciones SQL validan la identidad y los permisos del perfil. Ocultar un botón no es el mecanismo de protección de datos.
 
@@ -42,7 +42,7 @@ Las categorías y las unidades tienen que corresponder al uso real; registrar un
 5. Confirmar el registro. La operación crea compra, detalle, animales y estado de lote dentro de una misma transacción mediante `sgic_registrar_compra_animales`.
 6. Consultar el listado de animales y la compra registrada.
 
-Las entradas por DIIO no deben confundirse con SIPECweb: **Sincronizar con SIPECweb** solo compara archivos oficiales y no crea compras.
+La compra manual sigue disponible como alternativa. **Sincronizar con SIPECweb** permite además incorporar DIIO nuevos mediante un proceso separado que distingue compras de existencias iniciales, traslados y nacimientos.
 
 ### Registrar pesaje
 
@@ -121,6 +121,17 @@ El saldo se concilia como `entradas − salidas + ajustes firmados`; los registr
 3. Introducir comprador si procede, monto y fecha.
 4. Revisar la confirmación. El procedimiento de venta confirma ingreso y costo reconocido, marca los animales `VENDIDO` e impide vender el mismo DIIO nuevamente.
 
+### Venta con precio individual por DIIO
+
+1. Entrar a **Ventas → Venta con precios por DIIO** como ADMIN.
+2. Filtrar por DIIO o lote y seleccionar los animales activos.
+3. Introducir comprador opcional y fecha.
+4. Completar la columna editable **Precio venta**, o aplicar un precio común a los seleccionados.
+5. Revisar el ingreso total y el cuadro de confirmación.
+6. Confirmar la venta. Se guardan los precios individuales, se reconocen costos y utilidad por lote y los animales quedan `VENDIDO`.
+
+Este flujo confirma directamente; los borradores corresponden al formulario **Solicitar venta**.
+
 ### Borrador de venta
 
 1. Abrir **Ventas → Solicitar venta** y seleccionar los DIIO y condiciones económicas.
@@ -135,14 +146,21 @@ El saldo se concilia como `entradas − salidas + ajustes firmados`; los registr
 - **Historial y auditoría:** permite revisar eventos de creación, confirmación, baja, ajustes y autorizaciones conforme a los permisos.
 - El costo reconocido de ventas parciales no debe duplicarse en sucesivas operaciones.
 
-## 8. Conciliación SIPECweb
+## 8. Conciliación e incorporación desde SIPECweb
 
-1. Exportar el `.xls` desde SIPECweb.
+1. Exportar el `.xls` oficial desde SIPECweb.
 2. En **Animales → Sincronizar con SIPECweb**, cargarlo con cuenta ADMIN.
-3. Revisar DIIO nuevos, existentes, ausentes y observaciones.
-4. Cerrar el panel o elegir otro archivo.
+3. Revisar los DIIO nuevos, existentes, ausentes y observaciones. **Esta comparación no escribe datos.**
+4. Seleccionar **Incorporar DIIO nuevos con valorización**.
+5. Elegir tipo de ingreso: Compra, Existencia inicial, Traslado o Nacimiento.
+6. Elegir lote, fecha y documento opcional. En Compra puede seleccionarse un proveedor.
+7. Homologar razas y completar el valor base de cada DIIO en la tabla editable. Se permite aplicar un mismo precio o pegar una columna de importes.
+8. Revisar y confirmar la operación. El sistema valida los DIIO de nuevo y registra ingreso, animales, valor base y actualización del lote en una transacción.
+9. Comprobar el resultado en Animales y en Auditoría.
 
-**No se ejecuta ninguna mutación de animales.** La ausencia en el Excel no se traduce en venta, fallecimiento ni traslado. Ver [manual SIPECweb](./SIPEC_INTEGRACION.md).
+Solo el tipo **Compra** genera `compra_animal` y su detalle. Otros tipos guardan el valor económico base sin simular una compraventa. La ausencia del DIIO en el XLS no genera bajas; los animales con valor desconocido no se confirman como cero.
+
+Ver [manual SIPECweb](./SIPEC_INTEGRACION.md).
 
 ## 9. Comprobaciones y resolución de errores
 

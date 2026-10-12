@@ -10,15 +10,15 @@
 
 | Área | Capacidades disponibles |
 |---|---|
-| Resumen | Indicadores de animales activos, lotes, adquisiciones e inventario; acceso a los registros |
+| Resumen | Indicadores de animales activos, lotes, valor base de ganado e inventario; acceso a los registros |
 | Animales | Registro de compras por DIIO, ingreso en lote, pesajes, rectificaciones, fallecimientos y filtros por estado |
-| SIPECweb | Lectura y **comparación sin escritura** de exportaciones SAG `.xls` en XML Spreadsheet 2003 |
+| SIPECweb | Conciliación de XLS del SAG e **incorporación supervisada** con tipo de ingreso, raza, lote y valor individual |
 | Lotes | Consulta y división de lotes, conservando el origen y las restricciones contables |
 | Inventario | Catálogo de productos, presentaciones, conversiones, stock, kardex y costo promedio ponderado (PMP) |
 | Compras | Compras de insumos, confirmación inmediata o borrador, detalle por producto/proveedor |
 | Alimentación | Planes, composición, asignaciones, consumo real y ejecución desde plan |
 | Sanidad | Tratamientos, productos utilizados y costos |
-| Ventas y gastos | Ventas por DIIO, borradores de venta, gastos por lote o generales, rentabilidad |
+| Ventas y gastos | Venta estándar, **venta con precio individual por DIIO**, borradores, gastos y rentabilidad |
 | Solicitudes pendientes | Aprobación o anulación de borradores de **compras de insumos y ventas** |
 | Administración | Catálogos, perfiles con roles, auditoría y consultas operativas |
 
@@ -28,20 +28,27 @@ La navegación se organiza en un menú lateral. Las operaciones se abren desde s
 
 Se utiliza Supabase Auth con correo electrónico y contraseña. Cada cuenta nueva recibe un perfil `OPERADOR` inactivo; un `ADMIN` autorizado debe habilitarla. Los permisos se validan también en la base de datos y no solo en la interfaz.
 
-- **ADMIN:** datos maestros, compras, ajustes, ingresos/bajas de animales, gastos, ventas, autorizaciones de usuarios y sincronización SIPECweb de solo lectura.
+- **ADMIN:** datos maestros, compras, ajustes, ingresos/bajas de animales, gastos, ventas, autorizaciones de usuarios, conciliación e incorporación supervisada desde SIPECweb.
 - **OPERADOR:** pesajes, consumos de alimentación y tratamientos, con acceso a las consultas permitidas.
 - El primer administrador se habilita desde SQL Editor según [Configuración inicial](docs/PRODUCTION_SETUP.md).
 
-## Sincronizar con SIPECweb
+## Sincronizar e incorporar animales desde SIPECweb
 
-En **Animales → Sincronizar con SIPECweb**, un administrador puede seleccionar el `.xls` exportado desde la opción *Consulta animales* del SAG.
+En **Animales → Sincronizar con SIPECweb**, un administrador carga el `.xls` exportado por SAG desde la consulta de animales presentes.
 
-1. El navegador lee y valida el XML Spreadsheet 2003, incluidos los espacios anómalos de ciertas declaraciones XML generadas por el SAG.
-2. Se conservan los DIIO como texto, incluidos los ceros iniciales; se validan encabezados, fechas y duplicados.
-3. Se consultan los DIIO registrados en SGIC y se muestran **nuevos**, **ya registrados** y **activos no presentes en el archivo**.
-4. Se revisan los resultados con filtros y una tabla de previsualización.
+1. El navegador interpreta el XML Spreadsheet 2003, conservando los ceros iniciales de cada DIIO.
+2. La pantalla compara DIIO **nuevos**, **ya registrados** y **ausentes de la exportación**, sin realizar cambios.
+3. Para incorporar nuevos DIIO, seleccionar **Incorporar DIIO nuevos con valorización**.
+4. Elegir tipo de ingreso: **compra, existencia inicial, traslado o nacimiento**.
+5. Seleccionar el lote o crear uno nuevo, registrar fecha, documento opcional y proveedor cuando corresponda.
+6. Homologar razas SAG con el catálogo y editar el valor económico de cada animal; se puede aplicar un importe común o pegar una columna de Excel.
+7. Revisar el valor total y confirmar explícitamente. La operación es **atómica** y rechaza DIIO duplicados.
 
-**Estado de la función:** comparación de solo lectura. No se importan animales, no se ejecutan compras y no se actualizan bajas. El archivo se analiza en el navegador; no se almacena en Supabase. No hay conexión automática ni API oficial SAG integrada. Ver [Manual SIPECweb](docs/SIPEC_INTEGRACION.md).
+**Contabilidad:** el sistema genera un documento de compra únicamente cuando el tipo de ingreso es **Compra**. Para existencia inicial, traslado y nacimiento registra el valor base sin inventar una compra. Todos los animales requieren valor positivo para confirmar: no se guarda precio desconocido como cero.
+
+En **Ventas → Venta con precios por DIIO**, el administrador puede seleccionar animales activos y asignar importes individuales. La venta guarda esos precios y calcula ingreso y utilidad por lote respetando las reglas contables.
+
+La exportación XLS se procesa en el navegador; solo se envían a Supabase los DIIO seleccionados y los datos confirmados para su incorporación. No existe sincronización automática ni API SAG integrada. Consultar [Manual SIPECweb](docs/SIPEC_INTEGRACION.md).
 
 ## Arquitectura
 
@@ -57,7 +64,7 @@ flowchart LR
 ```
 
 - **Frontend:** `frontend/`. La compilación de producción utiliza la URL y la clave pública publishable del proyecto Supabase autorizado; **nunca** una clave `service_role`/`sb_secret_`.
-- **Esquema de datos:** `supabase/migrations/`, 14 migraciones secuenciales versionadas; las tablas de dominio cuentan con RLS.
+- **Esquema de datos:** `supabase/migrations/`, 15 migraciones secuenciales versionadas; las tablas de dominio cuentan con RLS.
 - **Integridad:** restricciones relacionales, DIIO único, kardex firmado, transacciones atómicas y funciones de autorización.
 - **Backend Django:** código legado conservado como referencia; no se ejecuta en Cloudflare Pages.
 
@@ -90,4 +97,4 @@ Requisitos: Node.js 22 y npm.
 - [Esquema SQL y administración Supabase](supabase/README.md)
 - [Especificación funcional original v1.5, solo referencia](docs/SGIC_Terneros_Documentacion_Completa_v1.5.md)
 
-**Estado del módulo SIPECweb:** vista previa implementada; incorporación definitiva desde exportación y sincronización automática con SAG **no implementadas**.
+**Estado del módulo SIPECweb:** conciliación e incorporación confirmada con valorización individual implementadas. La interoperabilidad automática con SAG no está implementada.

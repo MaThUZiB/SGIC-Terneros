@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, extraerError } from '../api/client'
 import type { ResumenDashboard } from '../api/types'
-import { Card, MensajeError, PageHeader, Spinner } from '../components/ui'
+import { Card, MensajeError, Spinner } from '../components/ui'
 import { moneda, numero } from '../utils/format'
 
 export function DashboardPage() {
@@ -37,14 +37,14 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-5">
-      <PageHeader titulo="Dashboard" descripcion="Resumen general de la operación" />
+    <div className="space-y-7">
+      <div className="rounded-2xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-7 text-white shadow-lg shadow-emerald-950/10 sm:px-8">\n        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>\n        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Resumen de crianza</h1>\n        <p className="mt-2 max-w-xl text-sm text-emerald-100">Seguimiento de animales, inventario y resultados económicos en un solo lugar.</p>\n      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tarjetas.map((t) => (
-          <div key={t.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-xs uppercase tracking-wide text-slate-400">{t.label}</div>
-            <div className={`mt-1 text-2xl font-bold ${t.color}`}>{t.valor}</div>
+          <div key={t.label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.label}</div>
+            <div className={`mt-3 text-2xl font-semibold tracking-tight ${t.color}`}>{t.valor}</div>
           </div>
         ))}
       </div>

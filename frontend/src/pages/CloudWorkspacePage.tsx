@@ -134,7 +134,7 @@ export function CloudWorkspacePage() {
 
   const availableActions=getModuleActions(tab,esAdmin)
   const visibleActions=tab==='animales'&&esAdmin
-    ? [...availableActions,{id:'sipecSync',label:'Sincronizar con SIPECweb'}]
+    ? [{id:'sipecSync',label:'Sincronizar con SIPECweb'},...availableActions]
     : tab==='ventas'&&esAdmin
       ? [...availableActions,{id:'ventaIndividual',label:'Venta con precios por DIIO'}]
       : availableActions

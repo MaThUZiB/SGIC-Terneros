@@ -1,0 +1,36 @@
+name: Prepare Supabase client lockfile
+
+on:
+  push:
+    branches:
+      - feat/cloudflare-supabase-foundation-ui
+    paths:
+      - .github/workflows/prepare-supabase-dependency.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lock-dependency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and lock Supabase JS SDK
+        run: npm install @supabase/supabase-js@2 --save-exact
+        working-directory: frontend
+      - name: Commit reproducible dependency lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json frontend/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "build: add pinned Supabase JS SDK and lockfile"
+            git push origin HEAD:refs/heads/feat/cloudflare-supabase-foundation-ui
+          fi

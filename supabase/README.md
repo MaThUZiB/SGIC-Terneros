@@ -1,50 +1,45 @@
-# Migraciones Supabase de SGIC-Terneros
+# Supabase: esquema y control de acceso
 
-Estado: **migraciones iniciales aplicadas el 12/10/2026 al proyecto Supabase de desarrollo `rsqdtslkndgtaejkaoju`**. Se verificaron 28 tablas con RLS activo y el asesor de seguridad no devolvió alertas. El backend Django continúa siendo la implementación operativa de referencia.
+**Proyecto de desarrollo:** `rsqdtslkndgtaejkaoju` (São Paulo). Las migraciones de esta carpeta fueron ejecutadas y verificadas en ese proyecto el 12 de octubre de 2026. No se han cargado datos ganaderos reales.
 
-## Orden
+## Migraciones SQL (orden versionado)
 
-1. `supabase/migrations/20261012140000_initial_schema.sql`: 28 tablas de dominio, identificadores, claves foráneas, controles de estado y cantidad, DIIO único, relaciones de venta individual y auditoría.
-2. `supabase/migrations/20261012140100_security_baseline.sql`: activa Row Level Security y revoca acceso directo desde los roles públicos `anon` y `authenticated` sobre las tablas empresariales. Solo permite que un usuario autenticado consulte su propio perfil.
+1. `20261012133036_initial_schema_sgic_20261012.sql`: 28 tablas, relaciones, unicidad DIIO, restricciones e historial de ventas.
+2. `20261012133041_security_baseline_sgic_20261012.sql`: 28 tablas con RLS; negocio denegado a `anon` y `authenticated`; lectura del perfil propio.
+3. `20261012133137_auth_profiles_roles_sgic_20261012.sql`: perfil automático al crear cuentas Auth, inactivo por defecto, auditoría de permisos en esquema privado.
 
-**Advertencia:** No insertar datos de operación real aún. Faltan funciones transaccionales, autorización administrativa, semillas de datos, pruebas automatizadas y conversión del frontend. El estado de seguridad es deliberadamente restrictivo.
+Las marcas de versión de los archivos coinciden con el historial remoto recuperado tras la reconstrucción del entorno de desarrollo.
 
-## Aplicación futura
+## Verificaciones ejecutadas
 
-Para un **proyecto Supabase de desarrollo vacío**, verificar primero que no existan tablas con estos nombres y confirmar que el esquema esté listo:
+- 28 tablas creadas y 28 con RLS; ambas migraciones de base reaplicadas tras detectar que el proyecto estaba vacío al iniciar la segunda fase.
+- No había cuentas Auth ni perfiles al concluir la verificación.
+- `anon` y `authenticated` no pueden leer `animal`; `authenticated` no puede actualizar `perfil`, solo consultarlo mediante su propia identidad.
+- Dos triggers administrativos instalados y funciones `SECURITY DEFINER` privadas, sin permiso de ejecución directo para usuarios.
+- Asesor de seguridad: 27 avisos **informativos** por tablas con RLS y sin políticas; esto es intencionado hasta migrar cada módulo y abrir permisos controlados.
+- La comprobación completa de alta de usuario mediante Auth real queda pendiente (no se han creado cuentas artificiales).
 
-```bash
-supabase login
-supabase link --project-ref <id-del-proyecto-de-desarrollo>
-supabase db push
+## Puesta en marcha de identidades
+
+1. En Supabase Dashboard → Authentication → Users, crear o invitar la cuenta autorizada. El trigger crea el perfil como `OPERADOR` e `inactivo`.
+2. Para establecer el primer administrador, ejecutar **solo en SQL Editor con privilegios administrativos**, sustituyendo el correo de ejemplo:
+
+```sql
+update public.perfil
+set rol = 'ADMIN', activo = true
+where id = (select id from auth.users where email = 'administrador@ejemplo.cl')
+returning id, rol, activo;
 ```
 
-No ejecutar `db push` contra una base productiva ni copiar información real hasta completar auditoría, backup y prueba de restauración.
+3. Comprobar que devolvió exactamente una fila y que existe evento `PERMISOS` en `registro_auditoria`.
+4. Para aprobar operadores, habilitar `activo=true` por identidad verificada mediante un procedimiento administrativo. No conceder privilegios desde formularios React.
+5. Configurar `VITE_AUTH_PROVIDER=supabase`, `VITE_SUPABASE_URL` y la **clave publishable** en el entorno de frontend. Nunca usar `service_role` o contraseña de PostgreSQL.
+6. El login permite ingresar solamente a usuarios con perfil activo. En modo Supabase se presenta temporalmente un portal de migración, no módulos de negocio incompletos.
 
-## Validaciones mínimas
+## Límites de alcance
 
-- SQL válido y sin relaciones faltantes; verificación en una instancia PostgreSQL limpia con Supabase.
-- `animal.diio` único; lote original y derivado; FK correctas.
-- Restricciones de cantidad, precios, estados y movimientos.
-- Usuario anónimo: ninguna tabla del negocio accesible.
-- Usuario autenticado: solo lectura de su propio perfil; no puede modificar `rol`.
-- Ventas parciales: vinculación individual a `animal_venta`; costos consistentes sin doble reconocimiento (pendiente implementación).
-- Inventario y auditoría: operaciones atómicas en funciones confiables (pendiente implementación).
+Supabase está conectado para identidad y base, **no** para movimientos reales. Los procesos de inventario/PMP, ventas, compras, consumos, costos y auditoría de transacciones empresariales requieren RPC/Edge Functions atómicas, permisos RLS específicos y pruebas de concurrencia antes de exponerse.
 
-## Reglas de implementación
+Antes de aplicar migraciones adicionales mediante CLI, revisar `supabase migration list` y confirmar historial del proyecto seleccionado. Nunca volver a ejecutar el esquema inicial sobre tablas existentes.
 
-No exponer claves privilegiadas a React. Definir RLS y `GRANT` explícitos antes de exponer cada operación. Las funciones con `SECURITY DEFINER` deberán tener `search_path` seguro y verificaciones de rol en servidor. Mantener migraciones secuenciales y no modificar migraciones ya aplicadas.
-
-[Manual de arquitectura en Notion](https://app.notion.com/p/3f7b5e350d7181f5957df2b6c8b54634).
-
-## Ejecución verificada — 12/10/2026
-
-- Proyecto: `MaThUZiB's Project`, región `sa-east-1` (identificador `rsqdtslkndgtaejkaoju`).
-- Migración remota `20261012132425_initial_schema_sgic_20261012`: correcta.
-- Migración remota `20261012132436_security_baseline_sgic_20261012`: correcta.
-- 28/28 tablas de `public` con RLS activado; 0 filas de negocio en el momento de la verificación.
-- `anon` y `authenticated` sin permiso de lectura en `animal`.
-- `authenticated` puede consultar únicamente `perfil` conforme a política de identidad; no puede actualizarlo.
-- Asesor de seguridad: sin avisos.
-- **Historial:** el identificador cronológico remoto de las migraciones fue generado al aplicarlas mediante integración; no coincide con la marca en los nombres de los archivos Git. Antes de introducir el CLI en otros entornos, reconciliar el historial para evitar reaplicación. No ejecutar `db push` contra este proyecto sin comprobar antes `supabase_migrations.schema_migrations`.
-- El frontend sigue utilizando Django. No se ha creado identidad de administrador ni políticas de acceso a tablas empresariales.
+[Manual técnico en Notion](https://app.notion.com/p/3f7b5e350d7181f5957df2b6c8b54634)

@@ -183,45 +183,50 @@ export function CloudWorkspacePage() {
           </div>
         )}
 
-        <nav aria-label="Módulos de consulta" className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
+        <nav aria-label="Navegación principal del sistema" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Navegación principal · Selecciona un módulo</p>
+          <div className="flex flex-wrap gap-2">
           {tabs.filter(t => esAdmin || t.id !== 'usuarios').map(t => (
-            <button key={t.id} onClick={() => { setTab(t.id); setBuscar('') }}
+            <button key={t.id} onClick={() => abrirModulo(t.id)}
               aria-current={tab === t.id ? 'page' : undefined}
-              className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'bg-emerald-900 text-white' : 'text-slate-600 hover:bg-white'}`}>
+              className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'border-emerald-900 bg-emerald-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50'}`}>
               {t.label}
             </button>
           ))}
           <button onClick={() => setRevision(x => x + 1)} className="ml-auto whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
             Actualizar
           </button>
+          </div>
         </nav>
 
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-        {cargando && <div className="py-14 text-center text-sm text-slate-500">Cargando información desde Supabase…</div>}
+        {cargando && !datos && <div className="py-14 text-center text-sm text-slate-500">Cargando información desde Supabase…</div>}
 
-        {!cargando && !error && datos && (
+        {!error && datos && (
           <>
             {tab === 'operaciones' && <OperationalModules esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
+            {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
+            {tab === 'planes' && <PlansOverview />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport />}
             {tab === 'resumen' && (
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" />
-                  <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" />
-                  <Indicador nombre="Adquisiciones" valor={formatoDinero(adquisiciones)} nota="Suma de precios de los animales registrados" />
-                  <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" />
+                  <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
+                  <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
+                  <Indicador nombre="Adquisiciones" valor={formatoDinero(adquisiciones)} nota="Suma de precios de los animales registrados" onClick={()=>abrirModulo("compras")} />
+                  <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
                 </div>
                 <div className="grid gap-5 lg:grid-cols-2">
                   <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h2 className="font-semibold">Estado de lotes</h2>
                     <div className="mt-5 space-y-3">
                       {datos.lotes.map(l => (
-                        <div key={l.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm">
+                        <button type="button" onClick={()=>abrirModulo("lotes")} key={l.id} className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-left text-sm hover:bg-emerald-50">
                           <div><div className="font-semibold">{l.codigo}</div><div className="mt-1 text-xs text-slate-500">{formatoCantidad(l.cantidad_actual)} animales</div></div>
                           <Estado valor={l.estado} />
-                        </div>
+                        </button>
                       ))}
                       {datos.lotes.length === 0 && <TablaVacia texto="No existen lotes registrados." />}
                     </div>
@@ -233,9 +238,9 @@ export function CloudWorkspacePage() {
                     </p>
                     <div className="mt-5 space-y-3">
                       {datos.productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).slice(0,5).map(p => (
-                        <div key={p.id} className="flex items-center justify-between rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                        <button key={p.id} type="button" onClick={()=>abrirModulo("inventario")} className="flex w-full items-center justify-between rounded-xl bg-amber-50 px-4 py-3 text-left text-sm text-amber-950 hover:bg-amber-100">
                           <span className="font-medium">{p.nombre}</span><span>{formatoCantidad(p.stock_actual)} disponibles</span>
-                        </div>
+                        </button>
                       ))}
                       {faltantes === 0 && <TablaVacia texto="No existen alertas de stock." />}
                     </div>
@@ -244,20 +249,40 @@ export function CloudWorkspacePage() {
               </div>
             )}
 
+            {tab==='lotes' && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-lg font-semibold">Registro de lotes</h2>
+              <p className="mb-5 mt-1 text-sm text-slate-500">Existencias y estado de cada agrupación ganadera.</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {datos.lotes.map(l=><article key={l.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex justify-between gap-3"><strong>{l.codigo}</strong><Estado valor={l.estado}/></div>
+                  <p className="mt-4 text-2xl font-semibold">{formatoCantidad(l.cantidad_actual)}</p>
+                  <p className="text-sm text-slate-500">animales registrados actualmente</p>
+                  <button type="button" onClick={()=>{abrirModulo('animales','TODOS');setBuscar(l.codigo)}}
+                    className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales del lote →</button>
+                </article>)}
+                {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
+              </div>
+            </section>}
             {(tab === 'animales' || tab === 'inventario') && (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2><p className="mt-1 text-xs text-slate-500">Consulta de solo lectura</p></div>
+                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2><p className="mt-1 text-xs text-slate-500">Consultar registros y movimientos</p></div>
                   <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por DIIO, lote o producto"
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
                 </div>
+                {tab==='animales'&&<div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3" aria-label="Filtrar animales por estado">
+                  {(['TODOS','ACTIVO','FALLECIDO','VENDIDO'] as const).map(state=><button key={state} type="button" onClick={()=>setFiltroAnimal(state)}
+                    className={`rounded-full border px-3.5 py-2 text-xs font-semibold ${filtroAnimal===state?'border-emerald-900 bg-emerald-900 text-white':'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
+                    {state==='TODOS'?'Todos':state==='ACTIVO'?'Activos':state==='FALLECIDO'?'Fallecidos':'Vendidos'}
+                  </button>)}
+                </div>}
                 <div className="overflow-x-auto">
                   {tab === 'animales' ? (
                     listaAnimales.length === 0 ? <TablaVacia texto="No se encontraron animales." /> : (
                       <table className="min-w-full text-left text-sm">
                         <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">DIIO</th><th className="p-4">Lote</th><th className="p-4">Sexo</th><th className="p-4">Peso inicial</th><th className="p-4">Adquisición</th><th className="p-4">Estado</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                          {listaAnimales.map(a => <tr key={a.id} className="hover:bg-slate-50"><td className="p-4 font-semibold">{a.diio}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td></tr>)}
+                          {listaAnimales.map(a => <tr key={a.id} className={a.estado==='FALLECIDO'?'bg-rose-50/70 hover:bg-rose-100':'hover:bg-slate-50'}><td className="p-4 font-semibold">{a.diio}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td></tr>)}
                         </tbody>
                       </table>
                     )
@@ -280,14 +305,32 @@ export function CloudWorkspacePage() {
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h2 className="font-semibold">Compras de animales</h2>
                   <div className="mt-4 space-y-3">
-                    {datos.comprasAnimal.map(c => <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-4 text-sm"><div><div className="font-semibold">Compra #{c.id}</div><div className="mt-1 text-xs text-slate-500">{c.fecha}</div></div><strong>{formatoDinero(c.total)}</strong></div>)}
+                    {datos.comprasAnimal.map(c => {
+                      const list=datos.detalleAnimales.filter(d=>d.compra_id===c.id)
+                        .map(d=>datos.animales.find(a=>a.id===d.animal_id)?.diio??'DIIO #'+d.animal_id)
+                      const proveedor=datos.proveedores.find(p=>p.id===c.proveedor_id)?.nombre??'Proveedor sin especificar'
+                      return <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                        <div className="flex items-start justify-between gap-4"><div><div className="font-semibold">Compra de animales #{c.id}</div><div className="mt-1 text-xs text-slate-500">{c.fecha} · {proveedor}</div></div><strong>{formatoDinero(c.total)}</strong></div>
+                        <p className="mt-2 text-xs text-slate-600">{list.length} animales · {list.slice(0,5).join(', ')}{list.length>5?' y otros '+(list.length-5):''}</p>
+                      </div>
+                    })}
                     {datos.comprasAnimal.length === 0 && <TablaVacia texto="Sin compras registradas." />}
                   </div>
                 </section>
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h2 className="font-semibold">Compras de insumos</h2>
                   <div className="mt-4 space-y-3">
-                    {datos.comprasInsumo.map(c => <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-4 text-sm"><div><div className="font-semibold">{c.numero_documento ?? `Compra #${c.id}`}</div><div className="mt-1 text-xs text-slate-500">{c.fecha} · {c.estado}</div></div><strong>{formatoDinero(c.total)}</strong></div>)}
+                    {datos.comprasInsumo.map(c => {
+                      const lines=datos.detalleInsumos.filter(d=>d.compra_id===c.id)
+                      const provider=datos.proveedores.find(p=>p.id===c.proveedor_id)?.nombre??'Proveedor #'+c.proveedor_id
+                      return <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                        <div className="flex items-start justify-between gap-4"><div><div className="font-semibold">Compra de insumos #{c.id} · {provider}</div><div className="mt-1 text-xs text-slate-500">{c.fecha} · <span className={c.estado==='BORRADOR'?'font-semibold text-amber-800':'text-emerald-700'}>{c.estado==='BORRADOR'?'PENDIENTE':c.estado}</span> {c.numero_documento?'· '+c.numero_documento:''}</div></div><strong>{formatoDinero(c.total)}</strong></div>
+                        <div className="mt-3 space-y-1">{lines.map(d=><p key={d.producto_id+'-'+d.subtotal} className="text-xs text-slate-600">
+                          {datos.productos.find(p=>p.id===d.producto_id)?.nombre??'Producto #'+d.producto_id} · {formatoCantidad(d.cantidad)} presentaciones / {formatoCantidad(d.cantidad_base)} unidades base · {formatoDinero(d.subtotal)}
+                        </p>)}</div>
+                        {c.estado==='BORRADOR'&&<button type="button" onClick={()=>abrirModulo('pendientes')} className="mt-3 text-xs font-semibold text-amber-800 hover:underline">Revisar solicitud →</button>}
+                      </div>
+                    })}
                     {datos.comprasInsumo.length === 0 && <TablaVacia texto="Sin compras registradas." />}
                   </div>
                 </section>

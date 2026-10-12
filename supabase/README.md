@@ -1,41 +1,59 @@
-# Supabase — SGIC-Terneros
+# Supabase — Base de datos, autenticación y funciones
 
-El sistema utiliza Supabase Auth, PostgreSQL, RLS y funciones SQL para operaciones transaccionales. Frontend: React/Vite publicado en Cloudflare Pages. La implementación Django queda como referencia histórica.
+## 1. Alcance
 
-**Proyecto de ensayo:** rsqdtslkndgtaejkaoju (región São Paulo). **No utilizar datos empresariales reales hasta finalizar las verificaciones de seguridad y recuperación.**
+La base activa de SGIC-Terneros utiliza **Supabase PostgreSQL** con Auth, RLS y funciones SQL RPC. El frontend React/Vite se publica en Cloudflare Pages.
 
-## Infraestructura y migraciones
+**Proyecto productivo:** `mtecrgoyrfclnlctenss` · región `sa-east-1`. Los archivos de esta carpeta son la referencia versionada para reproducir el esquema y verificar sus invariantes.
 
-Las migraciones versionadas están en [migrations/](./migrations/) y fueron aplicadas a Supabase en orden secuencial. El esquema incluye 29 tablas públicas con RLS activado. Las políticas permiten consultar datos a perfiles activos, pero las tablas empresariales no conceden INSERT/UPDATE/DELETE directos al navegador. Todas las operaciones críticas requieren llamar a RPC autorizadas.
+## 2. Organización
 
-Las funciones de inventario, compras, pesajes, lotes, planes alimentarios, consumos, sanidad, gastos y ventas se describen en [Operaciones Supabase](../docs/OPERACIONES_SUPABASE.md).
+- `migrations/`: 14 migraciones SQL del esquema relacional, RLS, perfiles, funciones, índices y correcciones incrementales.
+- `tests/integrity_audit.sql`: controles de solo lectura de stock, lotes, compras y DIIO.
+- `tests/operational_smoke_rollback.sql`: ensayos transaccionales que se revierten; revisar instrucciones antes de ejecutar.
+- `seeds/demo_20261012.sql`: **exclusivamente datos ficticios para entornos aislados**. No ejecutar en producción.
+- `seeds/README.md`: instrucciones y restricciones de las semillas.
 
-### Uso de las migraciones
+## 3. Modelo de seguridad
 
-- Los archivos SQL contienen exactamente las versiones registradas en el historial remoto.
-- No reaplicar el esquema base sobre tablas existentes.
-- Antes de migrar otro entorno, verificar las versiones mediante la CLI y la base enlazada.
-- Las semillas DEMO viven en [seeds/](./seeds/); **no** deben desplegarse automáticamente en ambientes productivos.
+1. Supabase Auth identifica al usuario.
+2. El trigger `sgic_auth_user_created` crea `public.perfil` con rol `OPERADOR` y `activo=false`.
+3. Un ADMIN habilitado autoriza cuentas y roles desde la sección **Usuarios**; para el primer administrador se usa [configuración inicial](../docs/PRODUCTION_SETUP.md).
+4. Las tablas del esquema `public` están protegidas por RLS. La lectura depende de perfiles autorizados.
+5. Las funciones RPC de negocio verifican identidad/rol, ejecutan mutaciones atómicas y generan auditoría.
+6. En el cliente solo se utiliza clave `sb_publishable_` y URL pública. Nunca publicar `service_role`, `sb_secret_` o credenciales PostgreSQL.
 
-## Estado de la base de ensayo
+## 4. Instalación del esquema
 
-- 18 animales ficticios con identificadores DEMO, 2 lotes, 6 productos y compras de prueba.
-- Un administrador activo y verificado.
-- Ninguna venta ni consumo de inventario confirmado permanentemente durante la fase de pruebas SQL.
-- Se reparó el borrador DEMO-COT-001 para que los precios por unidad base y sus subtotales concilien.
-- Pruebas SQL de regresión: [operational_smoke_rollback.sql](./tests/operational_smoke_rollback.sql). Los cambios terminan con ROLLBACK.
+1. Crear un proyecto Supabase autorizado para el entorno.
+2. Verificar la compatibilidad de PostgreSQL y Supabase Auth.
+3. Aplicar las migraciones SQL **en orden de versión**, sin ejecutar scripts demo.
+4. Comprobar funciones y objetos registrados contra las migraciones.
+5. Revisar RLS, grants y los avisos de Security Advisor.
+6. Crear y habilitar al primer administrador.
+7. Ejecutar las comprobaciones de [integridad](./tests/integrity_audit.sql) sin alterar información.
 
-## Alta de usuarios
+**Regla:** una migración aplicada no se edita retroactivamente. Toda evolución del esquema requiere una nueva migración revisable y aplicada controladamente.
 
-1. Crear/invitar el usuario desde Supabase Dashboard → Authentication → Users, con correo verificado y contraseña segura.
-2. El trigger crea su perfil como OPERADOR inactivo.
-3. Un administrador puede habilitarlo, cambiar su rol o desactivarlo en la sección **Usuarios** de React; el cambio se audita y nunca se puede desactivar al último administrador activo.
-4. El login del frontend verifica Supabase Auth y la activación del perfil. Nunca almacenar service_role ni contraseñas de PostgreSQL en el cliente.
+## 5. Reglas transaccionales principales
 
-## Riesgos pendientes
+- `sgic_registrar_compra_animales` registra compras y DIIO únicos por lote.
+- `sgic_comprar_insumo` confirma compras directas y actualiza kardex/PMP.
+- `sgic_crear_compra_insumo` guarda compras en borrador; `sgic_confirmar_compra_insumo` confirma y `sgic_anular_borrador_insumo` anula antes de afectar stock.
+- `sgic_ajustar_stock` aplica ajustes firmados con motivo; no admite stock negativo.
+- `sgic_registrar_consumo` y `sgic_consumo_desde_plan` imputan consumo y valorización.
+- `sgic_registrar_tratamiento` descuenta insumos sanitarios y registra costo.
+- `sgic_confirmar_venta` y `sgic_confirmar_borrador_venta` reconocen ventas por DIIO, costos y estados; las ventas no pueden confirmarse dos veces.
+- `sgic_autorizar_usuario` administra activación y rol con autorización de ADMIN.
 
-El Security Advisor informa avisos para funciones SECURITY DEFINER públicas invocables por authenticated. Estas RPC tienen GRANT específicos para usuarios autenticados, identidad y rol verificados contra tablas de servidor, search_path fijo y auditoría. Esta arquitectura requiere auditoría externa y pruebas de penetración antes de su puesta en marcha empresarial.
+Las RPC no son una API pública anónima: su acceso requiere cuenta válida y se controla dentro de la base.
 
-Está pendiente activar **Leaked Password Protection** desde la configuración de Supabase Auth. También faltan pruebas de usuarios concurrentes reales, ensayos de restauración/backups, pruebas de interfaz autenticada extremo a extremo y mecanismos de idempotencia para evitar duplicaciones por reintentos de red.
+## 6. Operación segura
 
-**Estado:** módulos operativos centrales implementados y pruebas de SQL/compilación superadas. La publicación es todavía un entorno de demostración, no un sistema validado para operación empresarial.
+- Ejecutar `supabase/tests/integrity_audit.sql` periódicamente; los movimientos `SALIDA` contienen cantidades positivas y deben restarse al conciliar.
+- Mantener backups fuera de la plataforma. No copiar bases operativas a entornos no autorizados.
+- No ejecutar pruebas que alteren datos reales; las transacciones de ensayo deben revertirse explícitamente.
+- Mantener acceso restringido a SQL Editor y revisar las funciones `SECURITY DEFINER` con permiso para usuarios autenticados.
+- La lectura de un Excel SIPECweb se realiza en el **frontend** y no necesita tablas adicionales ni cargar el archivo en PostgreSQL.
+
+Consultar [manual de operación](../docs/OPERACIONES_SUPABASE.md), [despliegue](../docs/CLOUD_MIGRATION.md) y [continuidad](../docs/PRODUCTION_READINESS.md).

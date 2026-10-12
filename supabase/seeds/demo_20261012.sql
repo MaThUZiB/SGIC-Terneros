@@ -42,11 +42,11 @@ begin
   insert into public.raza(nombre) values ('Angus') returning id into v_raza_angus;
   insert into public.raza(nombre) values ('Hereford') returning id into v_raza_hereford;
 
-  insert into public.proveedor(nombre,activo,observaciones)
-    values ('Proveedor DEMO - Criadero Norte',true,'Registro ficticio de demostración')
+  insert into public.proveedor(nombre,activo)
+    values ('Proveedor DEMO - Criadero Norte',true)
     returning id into v_proveedor_a;
-  insert into public.proveedor(nombre,activo,observaciones)
-    values ('Proveedor DEMO - Feria Regional',true,'Registro ficticio de demostración')
+  insert into public.proveedor(nombre,activo)
+    values ('Proveedor DEMO - Feria Regional',true)
     returning id into v_proveedor_b;
 
   insert into public.lote(codigo,fecha_ingreso,cantidad_original,cantidad_actual,estado,observaciones)

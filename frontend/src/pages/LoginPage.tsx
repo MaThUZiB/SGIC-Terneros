@@ -32,7 +32,8 @@ export function LoginPage() {
         onSubmit={enviar}
         className="w-full max-w-md space-y-6 rounded-3xl border border-white/20 bg-white p-7 shadow-2xl shadow-slate-950/40 sm:p-10"
       >
-        <div className="space-y-3 text-center">\n          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-lg font-bold tracking-tight text-white shadow-lg shadow-emerald-800/20">SG</div>
+        <div className="space-y-3 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-lg font-bold tracking-tight text-white shadow-lg shadow-emerald-800/20">SG</div>
           <div className="text-2xl font-bold tracking-tight text-slate-900">SGIC-Terneros </div>
           <div className="text-sm text-slate-500">Gestión ganadera · Matus Company</div>
         </div>
@@ -60,7 +61,8 @@ export function LoginPage() {
         <Boton tipo="submit" disabled={cargando} className="w-full">
           {cargando ? 'Ingresando...' : 'Ingresar'}
         </Boton>
-        <p className="pt-2 text-center text-xs text-slate-400">Acceso restringido a usuarios autorizados</p>\n      </form>
+        <p className="pt-2 text-center text-xs text-slate-400">Acceso restringido a usuarios autorizados</p>
+      </form>
     </div>
   )
 }

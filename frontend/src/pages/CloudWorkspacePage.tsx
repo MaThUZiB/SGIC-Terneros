@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabase'
 import { useAuth } from '../auth/AuthContext'
-import { OperationalModules, OperationsHistory } from './OperationalModules'
+import { OperationalModules, OperationsHistory, getModuleActions } from './OperationalModules'
+import { SidebarNavigation, moduleTitles, type ModuleId } from '../components/SidebarNavigation'
+import { DomainRecords } from './DomainRecords'
 import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
 import { PlansOverview } from './PlansOverview'
@@ -23,8 +25,6 @@ type Datos = {
   animales: Animal[]; lotes: Lote[]; productos: Producto[]
   proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]; detalleAnimales: DetalleCompraAnimal[]; detalleInsumos: DetalleCompraInsumo[]
 }
-type Pestaña = 'resumen' | 'animales' | 'lotes' | 'inventario' | 'compras' | 'planes' | 'operaciones' | 'pendientes' | 'historial' | 'usuarios' | 'rentabilidad'
-
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
 const tabs: { id: Pestaña; label: string }[] = [
@@ -68,7 +68,9 @@ function TablaVacia({ texto }: { texto: string }) {
 export function CloudWorkspacePage() {
   const { user, esAdmin, logout } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<Pestaña>('resumen')
+  const [tab, setTab] = useState<ModuleId>('resumen')
+  const [menuOpen,setMenuOpen] = useState(false)
+  const [operation,setOperation] = useState<string|null>(null)
   const [datos, setDatos] = useState<Datos | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
@@ -136,10 +138,13 @@ export function CloudWorkspacePage() {
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
 
-  function abrirModulo(destino:Pestaña,filtro?:'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'){
+  function abrirModulo(destino:ModuleId,filtro?:'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'){
+    setOperation(null)
     setTab(destino);setBuscar('')
     if(filtro)setFiltroAnimal(filtro)
   }
+
+  const availableActions=getModuleActions(tab,esAdmin)
 
   function salir() {
     logout()
@@ -147,64 +152,76 @@ export function CloudWorkspacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-900 font-bold text-white">SG</div>
-            <div>
-              <div className="text-base font-bold tracking-tight">SGIC-Terneros</div>
-              <div className="text-xs text-slate-500">Gestión integral de crianza</div>
+    <div className="min-h-screen bg-[#f4f7f6] text-slate-900 lg:flex">
+      <SidebarNavigation current={tab} esAdmin={esAdmin} open={menuOpen}
+        onClose={()=>setMenuOpen(false)} onNavigate={abrirModulo}/>
+      <div className="min-w-0 flex-1">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-7 lg:px-9">
+            <div className="flex min-w-0 items-center gap-3">
+              <button type="button" aria-label="Abrir menú principal" aria-expanded={menuOpen}
+                className="rounded-xl border border-slate-200 p-2.5 text-slate-700 hover:bg-slate-50 lg:hidden"
+                onClick={()=>setMenuOpen(true)}>
+                <svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              </button>
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">SGIC · Gestión integral</div>
+                <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900">{moduleTitles[tab]}</h1>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+              <button type="button" onClick={()=>setRevision(x=>x+1)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Actualizar</button>
+              <div className="hidden text-right md:block">
+                <div className="text-sm font-semibold">{user?.username}</div>
+                <div className="text-xs text-slate-500">{esAdmin?'Administrador':'Operador'}</div>
+              </div>
+              <button type="button" onClick={salir} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Salir</button>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden text-right sm:block">
-              <div className="text-sm font-medium">{user?.username}</div>
-              <div className="text-xs text-slate-500">{esAdmin ? 'Administrador' : 'Operador'}</div>
-            </div>
-            <button onClick={salir} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50">Salir</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-8">
-        <section className="rounded-3xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-8 text-white shadow-lg sm:px-9">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Control ganadero</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
-            Gestiona animales, lotes, compras, inventario, alimentación y ventas con autorización por roles,
-            registros de auditoría y funciones transaccionales en PostgreSQL.
-          </p>
-        </section>
-
-        {demo && (
-          <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
-            <strong>Entorno de demostración.</strong> Los registros identificados como DEMO son ficticios y no representan operaciones empresariales reales.
-          </div>
-        )}
-
-        <nav aria-label="Navegación principal del sistema" className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          <p className="mb-3 px-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Navegación principal · Selecciona un módulo</p>
-          <div className="flex flex-wrap gap-2">
-          {tabs.filter(t => esAdmin || t.id !== 'usuarios').map(t => (
-            <button key={t.id} onClick={() => abrirModulo(t.id)}
-              aria-current={tab === t.id ? 'page' : undefined}
-              className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'border-emerald-900 bg-emerald-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50'}`}>
-              {t.label}
-            </button>
-          ))}
-          <button onClick={() => setRevision(x => x + 1)} className="ml-auto whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            Actualizar
-          </button>
-          </div>
-        </nav>
-
+        </header>
+        <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 sm:px-7 lg:px-9 lg:py-8">
+          {tab==='resumen'&&<section className="rounded-3xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-7 text-white shadow-lg sm:px-9">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Control ganadero</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
+              Accede a la gestión del ganado, inventario, producción y finanzas desde el menú lateral.
+            </p>
+          </section>}
+          {demo&&<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-950">
+            <strong>Entorno de demostración.</strong> Los registros DEMO son ficticios y no corresponden a operaciones empresariales reales.
+          </div>}
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
         {cargando && !datos && <div className="py-14 text-center text-sm text-slate-500">Cargando información desde Supabase…</div>}
 
         {!error && datos && (
           <>
-            {tab === 'operaciones' && <OperationalModules esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
+            {availableActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Acciones de {moduleTitles[tab]}</h2>
+                  <p className="mt-1 text-xs text-slate-500">Selecciona una acción para abrir su formulario aquí.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {availableActions.map(item=><button type="button" key={item.id}
+                    onClick={()=>setOperation(previous=>previous===item.id?null:item.id)}
+                    aria-expanded={operation===item.id}
+                    className={`rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${operation===item.id
+                      ?'border-emerald-800 bg-emerald-800 text-white'
+                      :'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-500 hover:bg-emerald-100'}`}>
+                    {item.label}
+                  </button>)}
+                </div>
+              </div>
+              {operation&&availableActions.some(item=>item.id===operation)&&
+                <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
+                  esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={()=>setOperation(null)}/>}
+            </section>}
+            {tab==='catalogos'&&<section className="rounded-2xl border border-slate-200 bg-white px-6 py-8">
+              <h2 className="text-lg font-semibold">Datos maestros</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Registra razas, proveedores, categorías, unidades de medida, productos y otros catálogos desde «Crear nuevo registro». Estas acciones requieren permiso de administración.</p>
+            </section>}
+            {(tab==='ventas'||tab==='sanidad'||tab==='gastos')&&<DomainRecords module={tab} revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
             {tab === 'planes' && <PlansOverview />}
@@ -343,7 +360,8 @@ export function CloudWorkspacePage() {
           SGIC-Terneros · Consultas autorizadas con Supabase Auth y RLS.
           Las acciones autorizadas ejecutan funciones PostgreSQL transaccionales y registran auditoría. Verifica las operaciones antes de confirmar.
         </footer>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

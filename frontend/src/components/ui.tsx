@@ -27,7 +27,7 @@ export function Boton({
       type={tipo}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${estilos[variante]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${estilos[variante]} ${className}`}
     >
       {children}
     </button>
@@ -44,7 +44,7 @@ export function Card({
   acciones?: ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm">
+    <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm shadow-slate-900/[0.03]">
       {(title || acciones) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
           {title && <h3 className="text-sm font-semibold text-slate-700">{title}</h3>}
@@ -68,7 +68,7 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-800 sm:text-2xl">{titulo}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{titulo}</h1>
         {descripcion && <p className="mt-0.5 text-sm text-slate-500">{descripcion}</p>}
       </div>
       {acciones && <div className="flex flex-wrap gap-2">{acciones}</div>}
@@ -93,7 +93,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 backdrop-blur-sm p-3 sm:p-6">
       <div
-        className={`mt-4 w-full ${ancho} rounded-xl bg-white shadow-2xl sm:mt-14`}
+        className={`mt-4 w-full ${ancho} rounded-2xl bg-white shadow-2xl sm:mt-14`}
         role="dialog"
         aria-modal="true"
       >

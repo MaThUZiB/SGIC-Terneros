@@ -27,14 +27,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-4 sm:p-8">
       <form
         onSubmit={enviar}
-        className="w-full max-w-sm space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
+        className="w-full max-w-md space-y-6 rounded-3xl border border-white/20 bg-white p-7 shadow-2xl shadow-slate-950/40 sm:p-10"
       >
-        <div className="text-center">
-          <div className="text-2xl font-bold text-emerald-700">SGIC-Terneros </div>
-          <div className="text-sm text-slate-400">Matus Company</div>
+        <div className="space-y-3 text-center">\n          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-lg font-bold tracking-tight text-white shadow-lg shadow-emerald-800/20">SG</div>
+          <div className="text-2xl font-bold tracking-tight text-slate-900">SGIC-Terneros </div>
+          <div className="text-sm text-slate-500">Gestión ganadera · Matus Company</div>
         </div>
         {error && <MensajeError mensaje={error} />}
         <label className="block">
@@ -60,7 +60,7 @@ export function LoginPage() {
         <Boton tipo="submit" disabled={cargando} className="w-full">
           {cargando ? 'Ingresando...' : 'Ingresar'}
         </Boton>
-      </form>
+        <p className="pt-2 text-center text-xs text-slate-400">Acceso restringido a usuarios autorizados</p>\n      </form>
     </div>
   )
 }

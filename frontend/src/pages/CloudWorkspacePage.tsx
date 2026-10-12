@@ -10,6 +10,7 @@ import { ProfitabilityReport } from './ProfitabilityReport'
 import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
 import { SipecSyncPreview } from './SipecSyncPreview'
+import { SaleIndividualPrices } from './SaleIndividualPrices'
 
 type Animal = {
   id: number; diio: string; lote_id: number; sexo: string; estado: string
@@ -134,7 +135,9 @@ export function CloudWorkspacePage() {
   const availableActions=getModuleActions(tab,esAdmin)
   const visibleActions=tab==='animales'&&esAdmin
     ? [...availableActions,{id:'sipecSync',label:'Sincronizar con SIPECweb'}]
-    : availableActions
+    : tab==='ventas'&&esAdmin
+      ? [...availableActions,{id:'ventaIndividual',label:'Venta con precios por DIIO'}]
+      : availableActions
 
   function salir() {
     logout()
@@ -204,8 +207,10 @@ export function CloudWorkspacePage() {
                 </div>
               </div>
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
-                <SipecSyncPreview onClose={()=>setOperation(null)}/>}
-              {operation&&operation!=='sipecSync'&&availableActions.some(item=>item.id===operation)&&
+                <SipecSyncPreview onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+              {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
+                <SaleIndividualPrices onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+              {operation&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={()=>setOperation(null)}/>}
             </section>}

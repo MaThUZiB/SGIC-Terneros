@@ -8,7 +8,7 @@ La base activa de SGIC-Terneros utiliza **Supabase PostgreSQL** con Auth, RLS y 
 
 ## 2. Organización
 
-- `migrations/`: 14 migraciones SQL del esquema relacional, RLS, perfiles, funciones, índices y correcciones incrementales.
+- `migrations/`: 15 migraciones SQL del esquema relacional, RLS, perfiles, funciones, índices y correcciones incrementales.
 - `tests/integrity_audit.sql`: controles de solo lectura de stock, lotes, compras y DIIO.
 - `tests/operational_smoke_rollback.sql`: ensayos transaccionales que se revierten; revisar instrucciones antes de ejecutar.
 - `seeds/demo_20261012.sql`: **exclusivamente datos ficticios para entornos aislados**. No ejecutar en producción.
@@ -44,6 +44,8 @@ La base activa de SGIC-Terneros utiliza **Supabase PostgreSQL** con Auth, RLS y 
 - `sgic_registrar_consumo` y `sgic_consumo_desde_plan` imputan consumo y valorización.
 - `sgic_registrar_tratamiento` descuenta insumos sanitarios y registra costo.
 - `sgic_confirmar_venta` y `sgic_confirmar_borrador_venta` reconocen ventas por DIIO, costos y estados; las ventas no pueden confirmarse dos veces.
+- `sgic_incorporar_desde_sipec` registra DIIO nuevos, tipo de ingreso, costo base y lote; genera compra únicamente para tipo COMPRA.
+- `sgic_venta_precios_individuales` almacena los importes de venta por DIIO y ajusta ingreso/utilidad por lote.
 - `sgic_autorizar_usuario` administra activación y rol con autorización de ADMIN.
 
 Las RPC no son una API pública anónima: su acceso requiere cuenta válida y se controla dentro de la base.
@@ -54,6 +56,6 @@ Las RPC no son una API pública anónima: su acceso requiere cuenta válida y se
 - Mantener backups fuera de la plataforma. No copiar bases operativas a entornos no autorizados.
 - No ejecutar pruebas que alteren datos reales; las transacciones de ensayo deben revertirse explícitamente.
 - Mantener acceso restringido a SQL Editor y revisar las funciones `SECURITY DEFINER` con permiso para usuarios autenticados.
-- La lectura de un Excel SIPECweb se realiza en el **frontend** y no necesita tablas adicionales ni cargar el archivo en PostgreSQL.
+- El archivo Excel SIPECweb se analiza en el **frontend** y no se almacena en PostgreSQL. Solo las incorporaciones expresamente confirmadas generan registros en `ingreso_sipec`, `ingreso_sipec_animal`, `animal` y, para COMPRA, `compra_animal`. Las ventas individuales se registran en `venta_precio_animal`. Las tres nuevas tablas tienen RLS y no admiten DML directo del cliente.
 
 Consultar [manual de operación](../docs/OPERACIONES_SUPABASE.md), [despliegue](../docs/CLOUD_MIGRATION.md) y [continuidad](../docs/PRODUCTION_READINESS.md).

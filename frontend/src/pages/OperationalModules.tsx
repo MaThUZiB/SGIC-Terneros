@@ -205,7 +205,25 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   async function submit(e:FormEvent){
     e.preventDefault();if(busy)return
     if((action==='venta'||action==='borradorVenta'||action==='division')&&selected.length===0){setError('Seleccione al menos un DIIO activo');return}
-    if(['venta','confirmarVenta','fallecimiento','confirmar','ajuste'].includes(action)&&
+    if(action==='animalRectificar'&&(!values.animal_id||!['MACHO','HEMBRA'].includes(values.sexo)||(values.motivo||'').trim().length<5)){
+      setError('Selecciona un animal y su sexo correcto. Explica el motivo con al menos 5 caracteres.');return
+    }
+    if(action==='compraInsumo'){
+      try{
+        const current=purchaseLine(values,lists)
+        const items=[...batchItems,...(current?[current]:[])]
+        if(!items.length)throw Error('Agrega al menos un producto.')
+        const total=items.reduce((sum,item)=>sum+subtotal(item),0)
+        const text=values.confirmar_ahora==='NO'
+          ? `Guardar borrador por ${money(total)}. NO ingresará stock hasta confirmar el borrador. ¿Continuar?`
+          : `Comprar por ${money(total)}. Ingresará stock, movimiento y PMP inmediatamente. ¿Continuar?`
+        if(!window.confirm(text))return
+      }catch(e){setError(e instanceof Error?e.message:'Compra inválida');return}
+    }
+    if(action==='confirmar'){
+      const current=(lists.compra||[]).find(x=>String(x.id)===values.compra_id)
+      if(!current||!window.confirm(`Confirmar borrador #${current.id} por ${money(Number(current.total||0))}. Revisa el total; la acción actualizará el inventario y no podrá revertirse directamente. ¿Continuar?`))return
+    }else if(['venta','confirmarVenta','fallecimiento','ajuste'].includes(action)&&
       !window.confirm('Esta operación registrará cambios auditados. ¿Confirmas?'))return
     setBusy(true);setError('');setOk('')
     try{
@@ -213,7 +231,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
       setOk(action==='compraInsumo' ? (values.confirmar_ahora==='NO' ? `Borrador #${result} guardado. No modifica inventario.` : `Compra #${result} confirmada. Stock, kardex y PMP actualizados.`) : 'Operación registrada. Referencia: '+String(result??'confirmada'))
       setValues(base());setSelected([]);setBatchAnimals([]);setBatchItems([]);await refresh();onChanged()
     }catch(e){
-      setError((e instanceof Error?e.message:'Error desconocido')+'. Comprueba el historial antes de repetir, por si ya se registró.')
+      setError((e instanceof Error?e.message:'Error desconocido') + (action==='animalRectificar'?'. Selecciona sexo y un motivo con al menos cinco caracteres.':'. Comprueba el historial antes de repetir, por si ya se registró.'))
     }finally{setBusy(false)}
   }
   let preview:Record<string,unknown>|null=null
@@ -241,25 +259,34 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
         <form onSubmit={submit} className="space-y-4">
           {S[action].fields.concat(more).map(f=>
             <label key={f.key} className="block text-sm">
-              <span className="mb-1.5 block font-medium">{f.label}</span>
+              <span className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
+                ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
+                :f.label}</span>
               {f.source?
                 <select className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" disabled={loading||busy}
-                  required={!f.optional} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
+                  required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&f.key==='producto_id')} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
                   <option value="">Seleccionar {f.optional?'(opcional)':''}</option>
                   {options(f.source).map(o=><option key={o.id} value={o.id}>{label(o,f.source!)}</option>)}
                 </select>:
                 <input className="w-full rounded-xl border border-slate-300 px-3 py-2.5" type={f.type||'text'}
                   min={f.type==='number'&&f.key!=='delta'?'0':undefined} step={f.type==='number'?'any':undefined}
-                  disabled={busy} required={!f.optional} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
+                  disabled={busy} required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&['cantidad','precio'].includes(f.key))} minLength={action==='animalRectificar'&&f.key==='motivo'?5:undefined} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
                   onChange={e=>setValues({...values,[f.key]:e.target.value})}/>}
             </label>)}
+          {action==='compraInsumo'&&<div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+            <p className="font-semibold">Resumen de compra</p>
+            <p className="mt-1">{precioPresentacion?'El precio ingresado corresponde a cada saco o presentación.':'El precio corresponde a cada unidad base del producto.'}</p>
+            {preview&&<p className="mt-1">Cantidad base: {String(preview.cantidad_base)} · costo por unidad base: {money(Number(preview.precio_unitario))}.</p>}
+            <p className="mt-2 font-semibold">Importe total: {money(previewTotal)}</p>
+            <p className="mt-1 text-xs">Si confirmas ahora se actualizarán inventario y PMP. Si guardas borrador, sus existencias no cambian.</p>
+          </div>}
           {(action==='compraAnimal'||action==='compraInsumo')&&<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-sm font-semibold text-emerald-950">
               Detalles agregados: {action==='compraAnimal'?batchAnimals.length:batchItems.length}
             </p>
             {(action==='compraAnimal'?batchAnimals:batchItems).map((entry,i)=>
               <div key={i} className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs">
-                <span>{String(entry.diio||entry.producto_id)} · {String(entry.precio_adquisicion||entry.precio_unitario||0)}</span>
+                <span>{String(entry.diio||entry.producto_id)} · {action==='compraInsumo'?`${String(entry.cantidad_base)} unidades base · ${money(subtotal(entry))}`:String(entry.precio_adquisicion||0)}</span>
                 <button type="button" onClick={()=>{
                   if(action==='compraAnimal')setBatchAnimals(prev=>prev.filter((_,j)=>i!==j))
                   else setBatchItems(prev=>prev.filter((_,j)=>i!==j))
@@ -269,7 +296,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
               className="mt-3 rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-white">
               + Agregar otro {action==='compraAnimal'?'ternero':'producto'}
             </button>
-            <p className="mt-2 text-xs text-emerald-900">Al registrar se incluye también el formulario actual. Todos los detalles se guardan en una sola transacción.</p>
+            <p className="mt-2 text-xs text-emerald-900">Se incluirá el formulario actual solo cuando contenga datos completos. Todos los detalles se registran en una transacción.</p>
           </div>}
           {(action==='venta'||action==='borradorVenta'||action==='division')&&<fieldset className="rounded-xl border border-slate-200 p-4">
             <legend className="px-2 text-sm font-semibold">Seleccionar animales ({selected.length})</legend>
@@ -282,7 +309,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
           </fieldset>}
           <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">Las operaciones producen cambios reales. Compras confirmadas, fallecimientos y ventas no admiten eliminación directa.</p>
           <button disabled={loading||busy} className="w-full rounded-xl bg-emerald-900 px-5 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-            {busy?'Registrando…':'Registrar operación'}
+            {busy?'Registrando…':action==='compraInsumo'?(values.confirmar_ahora==='NO'?'Guardar borrador':'Comprar y actualizar inventario'):'Registrar operación'}
           </button>
         </form>
       </section>

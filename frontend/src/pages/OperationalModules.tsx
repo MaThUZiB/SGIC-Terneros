@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../api/supabase'
 
-type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; total?: number; numero_documento?: string | null }
+type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null }
 type Lists = Record<string, Opt[]>
 type Field = { key: string; label: string; source?: string; type?: string; optional?: boolean }
 type Spec = { title: string; role: 'ADMIN' | 'TODOS'; fields: Field[]; help: string }
@@ -13,7 +13,7 @@ const S: Record<string, Spec> = {
   peso: {title:'Registrar pesaje',role:'TODOS',help:'Registra la evolución de peso del animal.',fields:[F('animal_id','DIIO','animal'),F('peso','Peso (kg)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
   fallecimiento: {title:'Registrar fallecimiento',role:'ADMIN',help:'La baja del animal actualiza el conteo y conserva su trazabilidad.',fields:[F('animal_id','DIIO','animal'),F('motivo','Causa / observaciones')]},
   division: {title:'Dividir lote',role:'ADMIN',help:'Selecciona el lote y marca los DIIO que se trasladarán. Se impide dividir lotes con costos o ventas históricas.',fields:[F('lote_id','Lote de origen','lote'),F('codigo','Código lote derivado')]},
-  compraInsumo: {title:'Crear compra de insumos',role:'ADMIN',help:'Borrador: el precio es por unidad base del producto. No mueve inventario hasta su confirmación.',fields:[F('proveedor_id','Proveedor','proveedor'),F('producto_id','Producto','producto'),F('cantidad','Cantidad (unidad base)',undefined,'number'),F('precio','Precio por unidad base',undefined,'number'),F('documento','Documento (opcional)',undefined,'text',true),F('fecha','Fecha',undefined,'date')]},
+  compraInsumo: {title:'Crear compra de insumos',role:'ADMIN',help:'Borrador: el precio es por unidad base del producto. No mueve inventario hasta su confirmación.',fields:[F('proveedor_id','Proveedor','proveedor'),F('producto_id','Producto','producto'),F('presentacion_id','Presentación opcional','presentacion_producto',undefined,true),F('cantidad','Cantidad (unidades base o presentaciones)',undefined,'number'),F('precio','Precio por unidad base',undefined,'number'),F('documento','Documento (opcional)',undefined,'text',true),F('fecha','Fecha',undefined,'date')]},
   confirmar: {title:'Confirmar compra / actualizar PMP',role:'ADMIN',help:'La operación genera el kardex y recalcula costo promedio ponderado. Rechaza borradores con totales inconsistentes.',fields:[F('compra_id','Compra pendiente','compra')]},
   anular: {title:'Anular compra borrador',role:'ADMIN',help:'Una compra confirmada no puede anularse.',fields:[F('compra_id','Compra pendiente','compra')]},
   ajuste: {title:'Ajuste de stock',role:'ADMIN',help:'Variación positiva o negativa, con motivo trazable y validación de existencias.',fields:[F('producto_id','Producto','producto'),F('delta','Variación (+/-)',undefined,'number'),F('motivo','Motivo')]},
@@ -92,7 +92,8 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
       method='sgic_crear_compra_insumo'
       params={p_proveedor_id:n(v.proveedor_id),p_fecha:v.fecha,p_documento:v.documento||null,
         p_detalles:[{producto_id:n(v.producto_id),cantidad:n(v.cantidad),
-          cantidad_base:n(v.cantidad),precio_unitario:n(v.precio)}]};break
+          presentacion_id:optionalN(v.presentacion_id),
+          ...(v.presentacion_id?{}:{cantidad_base:n(v.cantidad)}),precio_unitario:n(v.precio)}]};break
     case 'confirmar':method='sgic_confirmar_compra_insumo';params={p_compra_id:n(v.compra_id)};break
     case 'anular':method='sgic_anular_borrador_insumo';params={p_compra_id:n(v.compra_id)};break
     case 'ajuste':method='sgic_ajustar_stock';params={p_producto_id:n(v.producto_id),p_delta:n(v.delta),p_motivo:v.motivo};break
@@ -125,7 +126,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
   async function refresh(){
     if(!supabase)return
     setLoading(true)
-    const keys=['animal','lote','raza','proveedor','producto','venta','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo','asignacion_plan_lote']
+    const keys=['animal','lote','raza','proveedor','producto','venta','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo','asignacion_plan_lote','presentacion_producto']
     const results=await Promise.all(keys.map(k=>supabase!.from(k).select('*').order('id',{ascending:true}).limit(1000)))
     const next:Lists={}
     results.forEach((r,i)=>{next[keys[i]==='compra_insumo'?'compra':keys[i]]=(r.data||[]) as Opt[]})
@@ -152,6 +153,7 @@ export function OperationalModules({esAdmin,onChanged}:{esAdmin:boolean;onChange
     if(source==='sexo')return [{id:'MACHO',nombre:'Macho'},{id:'HEMBRA',nombre:'Hembra'}]
     const arr=lists[source]||[]
     if(source==='compra'||source==='venta')return arr.filter(o=>o.estado==='BORRADOR')
+    if(source==='presentacion_producto')return arr.filter(o=>o.activo!==false && String(o.producto_id)===values.producto_id)
     if(source==='asignacion_plan_lote')return arr.filter(o=>o.activo!==false)
     if(source==='lote'||source==='animal')return arr.filter(o=>o.estado==='ACTIVO')
     return arr.filter(o=>o.activo!==false)

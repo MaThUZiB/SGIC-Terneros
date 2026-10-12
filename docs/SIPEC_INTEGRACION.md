@@ -1,6 +1,19 @@
 # Evaluación preliminar: integración SAG SIPECweb con SGIC-Terneros
 
-**Estado:** estudio de factibilidad, **no implementada**. La posibilidad de consultar el RUP automáticamente depende de un mecanismo de acceso oficialmente autorizado por el SAG.
+**Estado:** primera fase de análisis y comparación de Excel implementada en el frontend, **sin escritura de animales**. La importación definitiva y la sincronización automática están pendientes. Consultar la fase inicial más abajo.
+
+## Primera etapa implementada — previsualización sin escritura
+
+Se añadió **Animales → Sincronizar con SIPECweb** al frontend React para usuarios ADMIN. La etapa inicial **NO incorpora animales ni guarda copias del archivo en Supabase**:
+
+- Acepta el archivo `.xls` real **XML Spreadsheet 2003** generado por la opción de exportación SIPECweb; admite `.xml` equivalente. No admite Excel binario, `.xlsx` ni PDF.
+- Analiza localmente en el navegador las columnas `NUMERO_DIIO`, `RAZA`, `CATEGORIA`, `FECHA_NACIMIENTO`, `ESTABLECIMIENTO`, `SEXO` y `GLOSA_PABCO`; `CANTIDAD` no se trata como cantidad de animales por fila.
+- Conserva el DIIO como texto (incluidos ceros iniciales), valida identificadores y fechas, detecta DIIO duplicados dentro del archivo y muestra observaciones.
+- Consulta los DIIO existentes de SGIC (lectura autenticada con RLS) y calcula: **nuevos**, **ya registrados** y **activos en SGIC ausentes del archivo**. Estos últimos **NO se dan de baja automáticamente**.
+- Pantalla de previsualización con tablas, totales y filtro; limita el tamaño de archivo a 8 MB y nunca usa `insert`, `update`, `delete` ni `rpc`.
+- El Excel aportado por el titular tiene 56 filas de animales con 56 DIIO únicos, ocho columnas y fechas de nacimiento en formato `DD/MM/AAAA`. Se utilizó solo para comprobar formato y diseñar el lector, **no se agregó al repositorio ni se importó a la base de producción**.
+- La creación/actualización de animales, asignación a lotes y costos queda reservada para una etapa posterior tras comprobar el resultado con el titular.
+- El Excel no indica automáticamente el RUP destino, FMA o precio pagado. `ESTABLECIMIENTO` no debe interpretarse como el RUP destino sin confirmación del SAG.
 
 ## Necesidad
 

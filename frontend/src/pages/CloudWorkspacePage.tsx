@@ -229,7 +229,7 @@ export function CloudWorkspacePage() {
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
                   <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
-                  <Indicador nombre="Adquisiciones" valor={formatoDinero(adquisiciones)} nota="Suma de precios de los animales registrados" onClick={()=>abrirModulo("compras")} />
+                  <Indicador nombre="Valor base del ganado" valor={formatoDinero(adquisiciones)} nota="Suma del valor inicial asignado a los animales" onClick={()=>abrirModulo("compras")} />
                   <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
                 </div>
                 <div className="grid gap-5 lg:grid-cols-2">

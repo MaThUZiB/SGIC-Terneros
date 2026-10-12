@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { extraerError } from '../api/client'
 import { usaSupabase } from '../api/supabase'
 import { Boton, MensajeError } from '../components/ui'
+import { MatusFooter } from '../components/MatusFooter'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -28,8 +29,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-4 sm:p-8">
-      <form
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 px-4 pt-4 sm:px-8 sm:pt-8">
+      <div className="flex w-full flex-1 items-center justify-center py-10">
+        <form
         onSubmit={enviar}
         className="w-full max-w-md space-y-6 rounded-3xl border border-white/20 bg-white p-7 shadow-2xl shadow-slate-950/40 sm:p-10"
       >
@@ -67,7 +69,9 @@ export function LoginPage() {
         </Boton>
         <p className="pt-2 text-center text-xs text-slate-400">Acceso restringido a usuarios autorizados</p>
         {usaSupabase && <p className="text-center text-xs text-slate-500">Las cuentas requieren habilitación administrativa.</p>}
-      </form>
+        </form>
+      </div>
+      <MatusFooter dark />
     </div>
   )
 }

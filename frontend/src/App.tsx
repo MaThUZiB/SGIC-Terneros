@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { usaSupabase } from './api/supabase'
+import { CloudWorkspacePage } from './pages/CloudWorkspacePage'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -24,6 +26,17 @@ import { LoteDetallePage } from './pages/LoteDetallePage'
 import { AuditoriaPage } from './pages/AuditoriaPage'
 
 export function App() {
+  // No mostrar operaciones Django cuando la sesión proviene de Supabase.
+  if (usaSupabase) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<ProtectedRoute><CloudWorkspacePage /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

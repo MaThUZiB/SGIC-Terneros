@@ -118,7 +118,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
     }
     if(selected.some(r=>!mapRaza[r.raza])){setError('Asigna una raza SGIC a cada raza del archivo.');return}
     setConfirm({
-      title:'Confirmar incorporación desde SIPECweb',
+      title:'Paso 3 de 3 · Guardar animales en SGIC',
       description:'Tipo: '+labels[tipo]+
         '\nAnimales: '+selected.length+
         '\nValor base total: '+money(selectedTotal)+
@@ -126,7 +126,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
         '\nLa incorporación creará animales activos y actualizará el conteo del lote de forma atómica. '+ 
         (tipo==='COMPRA'?'Se registrará también una compra de animales.':'No se generará una compra contable.')+
         '\nLa operación no puede revertirse desde esta pantalla.',
-      confirmLabel:'Confirmar '+selected.length+' animales',
+      confirmLabel:'Guardar '+selected.length+' animales',
     })
   }
   async function execute(){
@@ -164,7 +164,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
   return <section className="space-y-5 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div><h3 className="text-lg font-semibold text-slate-900">Incorporar animales seleccionados</h3>
-        <p className="mt-1 text-sm text-slate-600">Completa los valores antes de confirmar. El DIIO oficial no se modifica.</p></div>
+        <p className="mt-1 text-sm text-slate-600">Completa lote, fecha, raza y valor de cada animal. Después pulsa «Paso 3: revisar y guardar animales» y confirma el resumen.</p></div>
       <button type="button" onClick={onCancel} disabled={busy} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60">Volver a comparación</button>
     </div>
     {loading&&<p role="status" className="text-sm text-slate-600">Cargando lotes, razas y proveedores…</p>}
@@ -278,7 +278,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
           <p className="text-xl font-bold tabular-nums">{money(selectedTotal)}</p></div>
         <button type="button" onClick={prepare} disabled={busy||Boolean(error&&error.startsWith('No se pudieron'))}
           className="rounded-xl bg-emerald-800 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-900 disabled:opacity-50">
-          Revisar y confirmar incorporación
+          Paso 3: revisar y guardar animales
         </button>
       </div>
     </>}

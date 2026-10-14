@@ -38,7 +38,7 @@ En **Animales → Sincronizar con SIPECweb**, un administrador carga el `.xls` e
 
 1. El navegador interpreta el XML Spreadsheet 2003, conservando los ceros iniciales de cada DIIO.
 2. La pantalla compara DIIO **nuevos**, **ya registrados** y **ausentes de la exportación**, sin realizar cambios.
-3. Para incorporar nuevos DIIO, seleccionar **Incorporar DIIO nuevos con valorización**.
+3. Para incorporar nuevos DIIO, seleccionar **Continuar: completar valores y guardar**.
 4. Elegir tipo de ingreso: **compra, existencia inicial, traslado o nacimiento**.
 5. Seleccionar el lote o crear uno nuevo, registrar fecha, documento opcional y proveedor cuando corresponda.
 6. Homologar razas SAG con el catálogo y editar el valor económico de cada animal; se puede aplicar un importe común o pegar una columna de Excel.

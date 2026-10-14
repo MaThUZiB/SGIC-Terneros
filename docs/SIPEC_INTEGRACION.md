@@ -28,7 +28,7 @@ La comparación se basa en el conjunto de identificadores, no en restar el total
 
 Una vez comprobados los resultados:
 
-1. Seleccionar **Incorporar DIIO nuevos con valorización**.
+1. Seleccionar **Continuar: completar valores y guardar**.
 2. Elegir el **tipo de ingreso**:
    - **Compra:** genera compra de animales, detalle de compra y animales activos.
    - **Existencia inicial:** registra animales con valor base; **no** genera compra.
@@ -40,7 +40,7 @@ Una vez comprobados los resultados:
 6. Homologar cada raza SAG con el catálogo de SGIC. Se puede escoger una raza existente o registrar la raza SAG como nueva dentro de la misma transacción.
 7. En la tabla editable, seleccionar los DIIO y completar su **valor base (CLP)** uno a uno. Es posible aplicar un valor común o pegar una columna de precios en el orden visible de la selección. Los campos monetarios son de escritura directa (sin flechas ni incrementos con la rueda del ratón); admiten importes como `180000`, `180.000` y `180.000,50`.
 8. Revisar el número de animales, valor total, lote y tipo de ingreso.
-9. Pulsar **Revisar y confirmar incorporación** y aceptar el diálogo final.
+9. Pulsar **Paso 3: revisar y guardar animales** y aceptar el diálogo final.
 10. Comprobar el resultado en Animales y en el historial. Solo los DIIO seleccionados y confirmados pasan a formar parte de SGIC.
 
 **Reglas:** cada animal debe tener un valor económico positivo y una raza asignada. Se permiten hasta **200 DIIO por operación**. No se guarda un precio desconocido como cero ni se genera automáticamente una compra para tipos no comerciales. Si no se conoce aún el valor de un animal, su incorporación debe esperar a completar la valorización.
@@ -101,3 +101,16 @@ El formulario admite hasta 200 animales por venta. La venta estándar y los borr
 8. Utilizar pruebas SQL transaccionales revertidas o un proyecto separado; nunca dejar animales sintéticos en producción.
 
 Fuentes: [SIPECweb SAG](https://www.sag.gob.cl/ambitos-de-accion/sistema-oficial-de-informacion-pecuaria-sipecweb) · [Manual institucional](https://www.sag.gob.cl/sites/default/files/MANUAL%20USUARIO%20EXTERNO%20TITULAR%20SIPECWEB%20OCT%202024.pdf).
+
+## 9. Continuar después de guardar
+
+La confirmación muestra el número de ingreso y accesos a los pasos siguientes:
+
+1. **Ver animales guardados:** comprobar DIIO, lote y valor base en el registro.
+2. **Preparar productos:** registrar categorías, unidades de medida, proveedores y productos en Catálogos con los datos reales del predio.
+3. **Registrar insumos:** registrar las compras y confirmarlas para generar existencias y costo promedio. Un borrador todavía no ingresa stock.
+4. **Alimentación:** registrar consumos reales por lote o configurar y asignar un plan. El consumo descuenta inventario y acumula su costo.
+
+Los tratamientos se registran desde Sanidad y descuentan los productos utilizados. Los gastos se registran con su categoría y lote cuando corresponda. La importación de animales no inventa existencias de insumos ni costos históricos.
+
+Verificación del 14 de octubre de 2026: incorporación inicial y por compra, valorización, conteos, rechazo atómico de DIIO duplicados, compra de insumos, stock, consumo, tratamiento y venta por DIIO comprobados mediante transacciones revertidas. Los scripts están en `supabase/tests/sipec_ingreso_venta_rollback.sql` y `supabase/tests/sipec_operacion_inicial_rollback.sql`. La aceptación desde una sesión ADMIN en navegador sigue siendo una verificación distinta.

@@ -208,7 +208,7 @@ export function CloudWorkspacePage() {
                 </div>
               </div>
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
-                <SipecSyncPreview onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+                <SipecSyncPreview onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
                 <SaleIndividualPrices onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
               {operation&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&

@@ -9,11 +9,11 @@ export type AnimalRecord = {
 const money=(value:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(value)
 const date=(value:string|null)=>value?value.split('-').reverse().join('/'):'No registrada'
 
-export function AnimalCard({animal,raza,lote,esAdmin,initialAction,onClose,onChanged}:{
-  animal:AnimalRecord;raza:string;lote:string;esAdmin:boolean;initialAction?:string;onClose:()=>void;onChanged:()=>void
+export function AnimalCard({animal,raza,lote,esAdmin,action,onAction,onClose,onChanged}:{
+  animal:AnimalRecord;raza:string;lote:string;esAdmin:boolean;action:string|null;onAction:(action:string|null,replace?:boolean)=>void;onClose:()=>void;onChanged:()=>void
 }){
-  const [action,setAction]=useState<string|null>(initialAction??null)
   const [notice,setNotice]=useState('')
+  function setAction(value:string|null){setNotice('');onAction(value)}
   const heading=useRef<HTMLHeadingElement>(null)
   useEffect(()=>{heading.current?.focus()},[])
   return <section aria-label={'Ficha del ternero '+animal.diio} className="space-y-5 rounded-2xl border border-emerald-300 bg-white p-5 shadow-sm sm:p-7">
@@ -41,7 +41,7 @@ export function AnimalCard({animal,raza,lote,esAdmin,initialAction,onClose,onCha
     {action&&<OperationalModules key={action} esAdmin={esAdmin} module="animales" initialAction={action} initialAnimalId={animal.id}
       onClose={()=>setAction(null)} onChanged={()=>{
         setNotice(action==='fallecimiento'?'Fallecimiento registrado. Se conserva la ficha y se actualizó el lote.':'Datos registrados correctamente.')
-        setAction(null);onChanged()
+        onAction(null,true);onChanged()
       }}/>} 
   </section>
 }

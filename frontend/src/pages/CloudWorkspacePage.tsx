@@ -1,10 +1,11 @@
+import { useWorkspaceNavigation } from '../hooks/useWorkspaceNavigation'
 import { TableScroll } from '../components/TableScroll'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabase'
 import { useAuth } from '../auth/AuthContext'
 import { OperationalModules, OperationsHistory, getModuleActions } from './OperationalModules'
-import { SidebarNavigation, moduleTitles, type ModuleId } from '../components/SidebarNavigation'
+import { SidebarNavigation, moduleTitles } from '../components/SidebarNavigation'
 import { DomainRecords } from './DomainRecords'
 import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
@@ -56,16 +57,13 @@ function TablaVacia({ texto }: { texto: string }) {
 export function CloudWorkspacePage() {
   const { user, esAdmin, logout } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<ModuleId>('resumen')
+  const {tab,operation,animalCard,buscar,filtroAnimal,abrirModulo,setBuscar,setFiltroAnimal,
+    openOperation,closeOperation,openAnimal,closeAnimal,setAnimalAction}=useWorkspaceNavigation()
   const [menuOpen,setMenuOpen] = useState(false)
-  const [operation,setOperation] = useState<string|null>(null)
   const [datos, setDatos] = useState<Datos | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
-  const [buscar, setBuscar] = useState('')
-  const [filtroAnimal, setFiltroAnimal] = useState<'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'>('TODOS')
   const [revision, setRevision] = useState(0)
-  const [animalCard,setAnimalCard]=useState<{id:number;action?:string}|null>(null)
 
   useEffect(() => {
     let vigente = true
@@ -130,12 +128,6 @@ export function CloudWorkspacePage() {
   const demo = (datos?.animales ?? []).some(a => a.diio.startsWith('DEMO-'))
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
-
-  function abrirModulo(destino:ModuleId,filtro?:'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'){
-    setOperation(null);setAnimalCard(null)
-    setTab(destino);setBuscar('')
-    if(filtro)setFiltroAnimal(filtro)
-  }
 
   const availableActions=getModuleActions(tab,esAdmin)
   const visibleActions=tab==='animales'&&esAdmin
@@ -202,7 +194,7 @@ export function CloudWorkspacePage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {visibleActions.map(item=><button type="button" key={item.id}
-                    onClick={()=>{setAnimalCard(null);setOperation(previous=>previous===item.id?null:item.id)}}
+                    onClick={()=>operation===item.id?closeOperation():openOperation(item.id)}
                     aria-expanded={operation===item.id}
                     className={`rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${operation===item.id
                       ?'border-emerald-800 bg-emerald-800 text-white'
@@ -212,12 +204,12 @@ export function CloudWorkspacePage() {
                 </div>
               </div>
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
-                <SipecSyncPreview onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
+                <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
-                <SaleIndividualPrices onClose={()=>setOperation(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+                <SaleIndividualPrices onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
               {operation&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
-                  esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={()=>setOperation(null)}/>}
+                  esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={closeOperation}/>}
             </section>}
             {tab==='catalogos'&&<section className="rounded-2xl border border-slate-200 bg-white px-6 py-8">
               <h2 className="text-lg font-semibold">Datos maestros</h2>
@@ -276,15 +268,15 @@ export function CloudWorkspacePage() {
                   <div className="flex justify-between gap-3"><strong>{l.codigo}</strong><Estado valor={l.estado}/></div>
                   <p className="mt-4 text-2xl font-semibold">{formatoCantidad(l.cantidad_actual)}</p>
                   <p className="text-sm text-slate-500">animales registrados actualmente</p>
-                  <button type="button" onClick={()=>{abrirModulo('animales','TODOS');setBuscar(l.codigo)}}
+                  <button type="button" onClick={()=>abrirModulo('animales','TODOS',l.codigo)}
                     className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales del lote →</button>
                 </article>)}
                 {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
               </div>
             </section>}
-            {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id+':'+(animalCard.action??'')}
+            {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id}
               animal={fichaAnimal} raza={razasPorId.get(fichaAnimal.raza_id)??'Sin raza'} lote={lotesPorId.get(fichaAnimal.lote_id)??'Sin lote'}
-              esAdmin={esAdmin} initialAction={animalCard.action} onClose={()=>setAnimalCard(null)} onChanged={()=>setRevision(x=>x+1)}/>}
+              esAdmin={esAdmin} action={animalCard.action??null} onAction={setAnimalAction} onClose={closeAnimal} onChanged={()=>setRevision(x=>x+1)}/>}
             {(tab === 'animales' || tab === 'inventario') && (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -302,9 +294,9 @@ export function CloudWorkspacePage() {
                   {tab === 'animales' ? (
                     listaAnimales.length === 0 ? <TablaVacia texto="No se encontraron animales." /> : (
                       <table className="min-w-full text-left text-sm">
-                        <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">DIIO / ficha</th><th className="p-4">Raza</th><th className="p-4">Lote</th><th className="p-4">Sexo</th><th className="p-4">Peso inicial</th><th className="p-4">Valor base</th><th className="p-4">Estado</th><th className="p-4">Acciones</th></tr></thead>
+                        <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">DIIO / ficha</th><th className="p-4">Raza</th><th className="p-4">Lote</th><th className="p-4">Sexo</th><th className="p-4">Peso inicial</th><th className="p-4">Valor base</th><th className="p-4">Estado</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                          {listaAnimales.map(a => <tr key={a.id} className={a.estado==='FALLECIDO'?'bg-rose-50/70 hover:bg-rose-100':'hover:bg-slate-50'}><td className="p-4 font-semibold"><button type="button" className="text-emerald-800 underline underline-offset-4" aria-label={'Abrir ficha DIIO '+a.diio} onClick={()=>{setOperation(null);setAnimalCard({id:a.id})}}>{a.diio}</button></td><td className="p-4">{razasPorId.get(a.raza_id)??'—'}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td><td className="p-4">{esAdmin&&a.estado==='ACTIVO'&&<button type="button" className="whitespace-nowrap rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700" onClick={()=>{setOperation(null);setAnimalCard({id:a.id,action:'fallecimiento'})}}>Marcar fallecido</button>}</td></tr>)}
+                          {listaAnimales.map(a => <tr key={a.id} className={a.estado==='FALLECIDO'?'bg-rose-50/70 hover:bg-rose-100':'hover:bg-slate-50'}><td className="p-4 font-semibold"><button type="button" className="text-emerald-800 underline underline-offset-4" aria-label={'Abrir ficha DIIO '+a.diio} onClick={()=>openAnimal(a.id)}>{a.diio}</button></td><td className="p-4">{razasPorId.get(a.raza_id)??'—'}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td></tr>)}
                         </tbody>
                       </table>
                     )

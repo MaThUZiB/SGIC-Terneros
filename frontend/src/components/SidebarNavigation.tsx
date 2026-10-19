@@ -73,6 +73,13 @@ export function SidebarNavigation({
     return()=>document.removeEventListener('keydown',closeOnEscape)
   },[open,onClose])
 
+  useEffect(()=>{
+    if(!open)return
+    const previous=document.body.style.overflow
+    document.body.style.overflow='hidden'
+    return()=>{document.body.style.overflow=previous}
+  },[open])
+
   function body(){
     return <>
       <div className="flex items-center gap-3 border-b border-slate-800 px-5 py-6">
@@ -83,7 +90,7 @@ export function SidebarNavigation({
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l14 14M19 5 5 19"/></svg>
         </button>
       </div>
-      <nav aria-label="Módulos del sistema" className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
+      <nav aria-label="Módulos del sistema" className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5">
         {navigationGroups.map(group=>{
           const visible=group.entries.filter(entry=>esAdmin||!entry.adminOnly)
           if(!visible.length)return null
@@ -110,7 +117,7 @@ export function SidebarNavigation({
     </aside>
     {open&&<div className="fixed inset-0 z-50 lg:hidden">
       <button type="button" className="absolute inset-0 h-full w-full bg-slate-950/70" aria-label="Cerrar navegación" onClick={onClose}/>
-      <aside className="relative flex h-full w-[min(85vw,290px)] flex-col bg-slate-950 shadow-2xl" aria-label="Menú principal">
+      <aside className="mobile-navigation relative flex h-full w-[min(92vw,320px)] flex-col bg-slate-950 shadow-2xl" aria-label="Menú principal">
         {body()}
       </aside>
     </div>}

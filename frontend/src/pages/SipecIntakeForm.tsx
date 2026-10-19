@@ -1,3 +1,4 @@
+import { TableScroll } from '../components/TableScroll'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../api/supabase'
 import { parseClpAmount } from '../utils/clpInput'
@@ -249,7 +250,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
           className="mt-2 w-full rounded-lg border border-slate-300 p-2 font-mono text-sm"/>
         <button type="button" onClick={applyPastedPrices} className="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Aplicar precios de columna</button>
       </details>
-      <div className="max-h-[480px] overflow-auto rounded-lg border border-slate-200 bg-white">
+      <TableScroll className="rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-600">
             <tr><th className="p-3">
@@ -274,7 +275,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
             </tr>)}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
         <div><p className="text-xs text-slate-600">Valor económico de {selected.length} animales</p>
           <p className="text-xl font-bold tabular-nums">{money(selectedTotal)}</p></div>

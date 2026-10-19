@@ -1,3 +1,4 @@
+import { TableScroll } from '../components/TableScroll'
 import { useEffect, useState } from 'react'
 import { supabase } from '../api/supabase'
 
@@ -57,7 +58,7 @@ export function ProfitabilityReport(){
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-5"><h3 className="font-semibold">Desglose de costos</h3></div>
       {!rows.length?<p className="p-5 text-sm text-slate-500">No existen lotes registrados.</p>:
-      <div className="overflow-x-auto"><table className="min-w-full text-left text-sm">
+      <TableScroll><table className="min-w-full text-left text-sm">
         <thead><tr>{['Lote','Activos','Adquisición','Alimentación','Sanidad','Gastos','Costo total','Ventas','Costo reconocido','Utilidad'].map(t=>
           <th className="whitespace-nowrap p-3 text-xs uppercase tracking-wide text-slate-500" key={t}>{t}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{rows.map(r=><tr key={r.lote_id} className="hover:bg-slate-50">
@@ -71,7 +72,7 @@ export function ProfitabilityReport(){
           <td className="whitespace-nowrap p-3">{format(r.costo_reconocido)}</td>
           <td className="whitespace-nowrap p-3 font-semibold">{format(r.utilidad_ventas)}</td>
         </tr>)}</tbody>
-      </table></div>}
+      </table></TableScroll>}
     </div>
     <p className="text-xs text-slate-500">Nota: las cifras de utilidad excluyen gastos generales no imputados y descuentos comerciales no registrados.</p>
   </>}

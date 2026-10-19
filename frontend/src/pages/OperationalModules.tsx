@@ -1,3 +1,4 @@
+import { TableScroll } from '../components/TableScroll'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import type { ModuleId } from '../components/SidebarNavigation'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
@@ -433,12 +434,12 @@ export function OperationsHistory({esAdmin}:{esAdmin:boolean}){
       <h2 className="border-b border-slate-100 p-5 font-semibold">Historial · {view.replaceAll('_',' ')}</h2>
       {failure&&<p className="p-5 text-sm text-red-700">{failure}</p>}
       {!failure&&!data.length&&<p className="p-5 text-sm text-slate-500">Sin registros</p>}
-      {!failure&&data.length>0&&<div className="overflow-x-auto"><table className="min-w-full text-left text-sm">
+      {!failure&&data.length>0&&<TableScroll><table className="min-w-full text-left text-sm">
         <thead><tr>{['id',...views[view]].map(f=><th key={f} className="whitespace-nowrap p-3 text-xs uppercase text-slate-500">{f.replaceAll('_',' ')}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{data.map((r,i)=><tr key={String(r.id||i)}>
           {['id',...views[view]].map(f=><td key={f} className="whitespace-nowrap p-3">{r[f]===null?'—':String(r[f]??'')}</td>)}
         </tr>)}</tbody>
-      </table></div>}
+      </table></TableScroll>}
     </div>
   </section>
 }

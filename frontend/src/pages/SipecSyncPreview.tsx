@@ -1,3 +1,4 @@
+import { TableScroll } from '../components/TableScroll'
 import { useId, useMemo, useState, type ChangeEvent } from 'react'
 import { supabase } from '../api/supabase'
 import type { ModuleId } from '../components/SidebarNavigation'
@@ -205,7 +206,7 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
           </h3>
           <span className="text-xs text-slate-500">{shown.length} coincidencias · máximo 100 filas en pantalla</span>
         </div>
-        <div className="overflow-x-auto">
+        <TableScroll>
           <table className="w-full min-w-[830px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-600">
               <tr><th className="px-4 py-3">DIIO</th><th className="px-4 py-3">Raza</th><th className="px-4 py-3">Sexo</th>
@@ -227,7 +228,7 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
               {!shown.length&&<tr><td colSpan={7} className="p-7 text-center text-slate-500">No hay animales en este grupo.</td></tr>}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </div>
       <p className="text-xs leading-5 text-slate-500">
         La vista de comparación no escribe datos. Solo el formulario de incorporación, tras la confirmación explícita,

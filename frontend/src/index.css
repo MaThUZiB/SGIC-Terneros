@@ -23,3 +23,42 @@ thead th { background-color: #f8faf9; }
 tbody tr { transition: background-color 150ms ease; }
 input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+/* Keep wide data inside the table rather than widening the phone viewport. */
+#root { min-width: 0; }
+.sgic-shell { min-height: 100dvh; padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+.app-header { padding-top: env(safe-area-inset-top); }
+.sgic-shell footer { padding-bottom: env(safe-area-inset-bottom); }
+.app-main > *, .app-main form, .app-main fieldset { min-width: 0; }
+.app-main input:not([type="checkbox"]):not([type="radio"]), .app-main select, .app-main textarea { max-width: 100%; }
+.app-main p, .app-main dd { overflow-wrap: anywhere; }
+input[type="checkbox"], input[type="radio"] { min-height: 22px; width: 22px; height: 22px; flex-shrink: 0; accent-color: #047857; }
+.table-scroll {
+  position: relative;
+  max-width: 100%;
+  max-height: 65vh;
+  max-height: 65dvh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y pinch-zoom;
+  scrollbar-gutter: stable;
+}
+.table-scroll table { min-width: 640px; width: 100%; }
+.table-scroll thead { position: sticky; top: 0; z-index: 10; }
+.table-scroll th { white-space: nowrap; }
+.table-scroll td { min-width: 100px; white-space: nowrap; }
+.table-scroll td:first-child { white-space: nowrap; }
+.modal-viewport { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.modal-panel { max-height: calc(100vh - 32px); max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.mobile-navigation { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+@media (max-width: 639px) {
+  input, select, textarea { font-size: 16px !important; }
+  .app-main > section, .app-main section > section { min-width: 0; }
+  .app-main h2, .app-main h3 { overflow-wrap: anywhere; }
+  .table-scroll th, .table-scroll td { padding: 12px; }
+}
+@media (pointer: coarse) {
+  button:not([role="option"]), a { min-height: 44px; min-width: 44px; }
+  input:not([type="checkbox"]):not([type="radio"]), select { min-height: 44px; }
+  button, a { touch-action: manipulation; }
+}

@@ -27,13 +27,21 @@ export function OperationConfirmDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [details, busy, onCancel])
 
+  const isOpen=Boolean(details)
+  useEffect(()=>{
+    if(!isOpen)return
+    const previous=document.body.style.overflow
+    document.body.style.overflow='hidden'
+    return()=>{document.body.style.overflow=previous}
+  },[isOpen])
+
   if (!details) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-[3px]"
+    <div className="modal-viewport fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-[3px]"
       onMouseDown={event => { if (event.target === event.currentTarget && !busy) onCancel() }}>
       <section role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc"
-        className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
+        className="modal-panel w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-8">
         <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${details.danger ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}`}>
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-6 w-6">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 2.5 20h19L12 3Zm0 6v4m0 4h.01"/>

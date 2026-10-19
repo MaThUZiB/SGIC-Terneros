@@ -1,3 +1,4 @@
+import { TableScroll } from '../components/TableScroll'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabase'
@@ -149,13 +150,13 @@ export function CloudWorkspacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] text-slate-900 lg:flex">
+    <div className="sgic-shell min-h-screen bg-[#f4f7f6] text-slate-900 lg:flex">
       <SidebarNavigation current={tab} esAdmin={esAdmin} open={menuOpen}
         onClose={()=>setMenuOpen(false)} onNavigate={abrirModulo}/>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-7 lg:px-9">
-            <div className="flex min-w-0 items-center gap-3">
+        <header className="app-header border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:py-4 sm:px-7 lg:px-9">
+            <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto">
               <button type="button" aria-label="Abrir menú principal" aria-expanded={menuOpen}
                 className="rounded-xl border border-slate-200 p-2.5 text-slate-700 hover:bg-slate-50 lg:hidden"
                 onClick={()=>setMenuOpen(true)}>
@@ -166,7 +167,7 @@ export function CloudWorkspacePage() {
                 <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900">{moduleTitles[tab]}</h1>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+            <div className="flex w-full shrink-0 items-center justify-end gap-3 sm:w-auto sm:gap-5">
               <button type="button" onClick={()=>setRevision(x=>x+1)}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Actualizar</button>
               <div className="hidden text-right md:block">
@@ -177,7 +178,7 @@ export function CloudWorkspacePage() {
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1440px] flex-1 space-y-5 px-4 py-6 sm:px-7 lg:px-9 lg:py-8">
+        <main className="app-main mx-auto w-full min-w-0 max-w-[1440px] flex-1 space-y-4 px-3 py-4 sm:px-7 lg:px-9 lg:py-8">
           {tab==='resumen'&&<section className="rounded-3xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-7 text-white shadow-lg sm:px-9">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Control ganadero</h2>
@@ -297,7 +298,7 @@ export function CloudWorkspacePage() {
                     {state==='TODOS'?'Todos':state==='ACTIVO'?'Activos':state==='FALLECIDO'?'Fallecidos':'Vendidos'}
                   </button>)}
                 </div>}
-                <div className="overflow-x-auto">
+                <TableScroll>
                   {tab === 'animales' ? (
                     listaAnimales.length === 0 ? <TablaVacia texto="No se encontraron animales." /> : (
                       <table className="min-w-full text-left text-sm">
@@ -317,7 +318,7 @@ export function CloudWorkspacePage() {
                       </table>
                     )
                   )}
-                </div>
+                </TableScroll>
               </section>
             )}
 

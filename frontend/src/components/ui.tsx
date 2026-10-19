@@ -1,3 +1,4 @@
+import { TableScroll } from './TableScroll'
 import type { ReactNode } from 'react'
 
 export function Boton({
@@ -173,7 +174,7 @@ export function Tabla<T extends { id: number }>({
   if (datos.length === 0) return <EstadoVacio />
   const claseCelda = (c: Columna<T>) => `px-3 py-2.5 align-middle ${c.ocultaEnMovil ? 'hidden sm:table-cell' : ''}`
   return (
-    <div className="-mx-1 overflow-x-auto px-1">
+    <TableScroll className="px-1">
       <table className="min-w-full divide-y divide-slate-100 text-sm">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
@@ -209,7 +210,7 @@ export function Tabla<T extends { id: number }>({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   )
 }
 

@@ -1,3 +1,4 @@
+import { TableScroll } from '../components/TableScroll'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../api/supabase'
 import { parseClpAmount } from '../utils/clpInput'
@@ -123,7 +124,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
         </div>
       </div>
       <p className="text-xs text-slate-600">Seleccionados: {selected.length} · Sin precio: {missing.length} · Activos disponibles: {animales.length}</p>
-      <div className="max-h-[450px] overflow-auto rounded-xl border border-slate-200">
+      <TableScroll className="rounded-xl border border-slate-200">
         <table className="w-full min-w-[740px] text-left text-sm">
           <thead className="sticky top-0 bg-slate-100 text-xs uppercase text-slate-600">
             <tr><th className="p-3"><input type="checkbox" aria-label="Seleccionar animales visibles"
@@ -148,7 +149,7 @@ export function SaleIndividualPrices({onClose,onChanged}:{
             {shown.length===0&&<tr><td colSpan={5} className="p-7 text-center text-slate-500">No hay animales para mostrar.</td></tr>}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       {shown.length>500&&<p className="text-xs text-amber-800">Se muestran 500 coincidencias. Filtra por DIIO o lote para encontrar otros animales.</p>}
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-4">
         <div><p className="text-sm text-slate-600">Ingreso estimado de venta</p>

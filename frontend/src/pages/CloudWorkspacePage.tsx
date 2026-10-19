@@ -11,12 +11,10 @@ import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
 import { SipecSyncPreview } from './SipecSyncPreview'
 import { SaleIndividualPrices } from './SaleIndividualPrices'
+import { AnimalCard, type AnimalRecord } from './AnimalCard'
 import { MatusFooter } from '../components/MatusFooter'
 
-type Animal = {
-  id: number; diio: string; lote_id: number; sexo: string; estado: string
-  precio_adquisicion: number; peso_ingreso_kg: number | null
-}
+type Animal = AnimalRecord
 type Lote = { id: number; codigo: string; cantidad_actual: number; estado: string }
 type Producto = { id: number; nombre: string; stock_actual: number; stock_minimo: number; costo_promedio: number }
 type Proveedor = { id: number; nombre: string }
@@ -25,7 +23,7 @@ type CompraInsumo = { id: number; proveedor_id: number; fecha: string; total: nu
 type DetalleCompraAnimal = { compra_id:number; animal_id:number }
 type DetalleCompraInsumo = { compra_id:number; producto_id:number; cantidad:number; cantidad_base:number; subtotal:number }
 type Datos = {
-  animales: Animal[]; lotes: Lote[]; productos: Producto[]
+  animales: Animal[]; razas: {id:number;nombre:string}[]; lotes: Lote[]; productos: Producto[]
   proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]; detalleAnimales: DetalleCompraAnimal[]; detalleInsumos: DetalleCompraInsumo[]
 }
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
@@ -66,6 +64,7 @@ export function CloudWorkspacePage() {
   const [buscar, setBuscar] = useState('')
   const [filtroAnimal, setFiltroAnimal] = useState<'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'>('TODOS')
   const [revision, setRevision] = useState(0)
+  const [animalCard,setAnimalCard]=useState<{id:number;action?:string}|null>(null)
 
   useEffect(() => {
     let vigente = true
@@ -80,8 +79,8 @@ export function CloudWorkspacePage() {
       setCargando(true)
       setError('')
       try {
-        const [a, l, p, pr, ca, ci, da, di] = await Promise.all([
-          supabase.from('animal').select('id,diio,lote_id,sexo,estado,precio_adquisicion,peso_ingreso_kg').order('diio').limit(1000),
+        const [a, l, p, pr, ca, ci, da, di, ra] = await Promise.all([
+          supabase.from('animal').select('id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones').order('diio').limit(1000),
           supabase.from('lote').select('id,codigo,cantidad_actual,estado').order('codigo').limit(500),
           supabase.from('producto').select('id,nombre,stock_actual,stock_minimo,costo_promedio').order('nombre').limit(500),
           supabase.from('proveedor').select('id,nombre').order('nombre').limit(200),
@@ -89,12 +88,14 @@ export function CloudWorkspacePage() {
           supabase.from('compra_insumo').select('id,fecha,total,estado,numero_documento,proveedor_id').order('fecha', { ascending: false }).limit(300),
           supabase.from('detalle_compra_animal').select('compra_id,animal_id').limit(1000),
           supabase.from('detalle_compra_insumo').select('compra_id,producto_id,cantidad,cantidad_base,subtotal').limit(1000),
+          supabase.from('raza').select('id,nombre').order('nombre').limit(1000),
         ])
-        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error, da.error, di.error].find(Boolean)
+        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error, da.error, di.error, ra.error].find(Boolean)
         if (fallo) throw new Error(fallo.message)
         if (vigente) {
           setDatos({
             animales: (a.data ?? []) as Animal[],
+            razas: ra.data??[],
             lotes: (l.data ?? []) as Lote[],
             productos: (p.data ?? []) as Producto[],
             proveedores: (pr.data ?? []) as Proveedor[],
@@ -116,8 +117,10 @@ export function CloudWorkspacePage() {
   }, [revision])
 
   const lotesPorId = useMemo(() => new Map((datos?.lotes ?? []).map(l => [l.id, l.codigo])), [datos])
+  const razasPorId = new Map((datos?.razas??[]).map(r=>[r.id,r.nombre]))
+  const fichaAnimal = datos?.animales.find(a=>a.id===animalCard?.id)
   const listaAnimales = (datos?.animales ?? []).filter(a =>
-    (filtroAnimal==='TODOS'||a.estado===filtroAnimal) && (a.diio.toLowerCase().includes(buscar.toLowerCase()) ||
+    (filtroAnimal==='TODOS'||a.estado===filtroAnimal) && (a.diio.toLowerCase().includes(buscar.trim().toLowerCase()) || (razasPorId.get(a.raza_id)??'').toLowerCase().includes(buscar.trim().toLowerCase()) ||
     (lotesPorId.get(a.lote_id) ?? '').toLowerCase().includes(buscar.toLowerCase())),
   )
   const listaProductos = (datos?.productos ?? []).filter(p => p.nombre.toLowerCase().includes(buscar.toLowerCase()))
@@ -128,7 +131,7 @@ export function CloudWorkspacePage() {
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
 
   function abrirModulo(destino:ModuleId,filtro?:'TODOS'|'ACTIVO'|'FALLECIDO'|'VENDIDO'){
-    setOperation(null)
+    setOperation(null);setAnimalCard(null)
     setTab(destino);setBuscar('')
     if(filtro)setFiltroAnimal(filtro)
   }
@@ -198,7 +201,7 @@ export function CloudWorkspacePage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {visibleActions.map(item=><button type="button" key={item.id}
-                    onClick={()=>setOperation(previous=>previous===item.id?null:item.id)}
+                    onClick={()=>{setAnimalCard(null);setOperation(previous=>previous===item.id?null:item.id)}}
                     aria-expanded={operation===item.id}
                     className={`rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${operation===item.id
                       ?'border-emerald-800 bg-emerald-800 text-white'
@@ -278,11 +281,14 @@ export function CloudWorkspacePage() {
                 {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
               </div>
             </section>}
+            {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id+':'+(animalCard.action??'')}
+              animal={fichaAnimal} raza={razasPorId.get(fichaAnimal.raza_id)??'Sin raza'} lote={lotesPorId.get(fichaAnimal.lote_id)??'Sin lote'}
+              esAdmin={esAdmin} initialAction={animalCard.action} onClose={()=>setAnimalCard(null)} onChanged={()=>setRevision(x=>x+1)}/>}
             {(tab === 'animales' || tab === 'inventario') && (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2><p className="mt-1 text-xs text-slate-500">Consultar registros y movimientos</p></div>
-                  <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por DIIO, lote o producto"
+                  <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
                 </div>
                 {tab==='animales'&&<div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3" aria-label="Filtrar animales por estado">
@@ -295,9 +301,9 @@ export function CloudWorkspacePage() {
                   {tab === 'animales' ? (
                     listaAnimales.length === 0 ? <TablaVacia texto="No se encontraron animales." /> : (
                       <table className="min-w-full text-left text-sm">
-                        <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">DIIO</th><th className="p-4">Lote</th><th className="p-4">Sexo</th><th className="p-4">Peso inicial</th><th className="p-4">Adquisición</th><th className="p-4">Estado</th></tr></thead>
+                        <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">DIIO / ficha</th><th className="p-4">Raza</th><th className="p-4">Lote</th><th className="p-4">Sexo</th><th className="p-4">Peso inicial</th><th className="p-4">Valor base</th><th className="p-4">Estado</th><th className="p-4">Acciones</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                          {listaAnimales.map(a => <tr key={a.id} className={a.estado==='FALLECIDO'?'bg-rose-50/70 hover:bg-rose-100':'hover:bg-slate-50'}><td className="p-4 font-semibold">{a.diio}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td></tr>)}
+                          {listaAnimales.map(a => <tr key={a.id} className={a.estado==='FALLECIDO'?'bg-rose-50/70 hover:bg-rose-100':'hover:bg-slate-50'}><td className="p-4 font-semibold"><button type="button" className="text-emerald-800 underline underline-offset-4" aria-label={'Abrir ficha DIIO '+a.diio} onClick={()=>{setOperation(null);setAnimalCard({id:a.id})}}>{a.diio}</button></td><td className="p-4">{razasPorId.get(a.raza_id)??'—'}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td><td className="p-4">{esAdmin&&a.estado==='ACTIVO'&&<button type="button" className="whitespace-nowrap rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700" onClick={()=>{setOperation(null);setAnimalCard({id:a.id,action:'fallecimiento'})}}>Marcar fallecido</button>}</td></tr>)}
                         </tbody>
                       </table>
                     )

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../api/supabase'
 import { parseClpAmount } from '../utils/clpInput'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
@@ -37,6 +37,8 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
   const [razas,setRazas]=useState<Option[]>([])
   const [proveedores,setProveedores]=useState<Option[]>([])
   const [error,setError]=useState('')
+  const errorRef=useRef<HTMLDivElement>(null)
+  useEffect(()=>{if(error)errorRef.current?.focus()},[error])
   const [loading,setLoading]=useState(true)
   const [busy,setBusy]=useState(false)
   const [confirm,setConfirm]=useState<ConfirmDetails|null>(null)
@@ -168,7 +170,7 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
       <button type="button" onClick={onCancel} disabled={busy} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60">Volver a comparación</button>
     </div>
     {loading&&<p role="status" className="text-sm text-slate-600">Cargando lotes, razas y proveedores…</p>}
-    {error&&<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+    {error&&<div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
     {!loading&&<>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1 text-sm font-semibold">Tipo de ingreso

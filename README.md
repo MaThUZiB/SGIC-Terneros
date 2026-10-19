@@ -32,6 +32,13 @@ Se utiliza Supabase Auth con correo electrónico y contraseña. Cada cuenta nuev
 - **OPERADOR:** pesajes, consumos de alimentación y tratamientos, con acceso a las consultas permitidas.
 - El primer administrador se habilita desde SQL Editor según [Configuración inicial](docs/PRODUCTION_SETUP.md).
 
+## Consultar y gestionar un ternero
+
+- En **Animales**, escribe parte del DIIO, raza o lote para filtrar los registros. Pulsa el DIIO para abrir su ficha individual con identificación, fechas, valor base, peso inicial y observaciones.
+- Un administrador puede usar **Marcar fallecido** desde la fila o **Marcar como fallecido** desde la ficha. El animal queda seleccionado: solo se completa la causa y se confirma el DIIO del resumen. La ficha conserva el estado actualizado y la operación descuenta el conteo del lote.
+- Los formularios de pesaje, tratamiento, fallecimiento y rectificación permiten escribir parte del DIIO y elegir una coincidencia con raza, lote y valor base. Escribir por sí solo no selecciona un animal.
+- En **Dividir lote**, cada animal muestra raza y valor base. La búsqueda conserva las selecciones; cambiar el lote de origen las limpia. Los animales marcados se muestran por separado y pueden quitarse sin buscarlos de nuevo.
+
 ## Sincronizar e incorporar animales desde SIPECweb
 
 En **Animales → Sincronizar con SIPECweb**, un administrador carga el `.xls` exportado por SAG desde la consulta de animales presentes.

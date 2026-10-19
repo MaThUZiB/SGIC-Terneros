@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
 import type { ModuleId } from '../components/SidebarNavigation'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
+import { AnimalSearch } from '../components/AnimalSearch'
 import { supabase } from '../api/supabase'
 
-type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number }
+type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number; raza_id?: number; precio_adquisicion?: number }
 type Lists = Record<string, Opt[]>
 type Field = { key: string; label: string; source?: string; type?: string; optional?: boolean }
 type Spec = { title: string; role: 'ADMIN' | 'TODOS'; fields: Field[]; help: string }
@@ -153,19 +154,21 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
   return result.data
 }
 export function OperationalModules({
-  esAdmin, onChanged, module, initialAction, onClose,
+  esAdmin, onChanged, module, initialAction, onClose, initialAnimalId,
 }:{
-  esAdmin:boolean; onChanged:()=>void; module:ModuleId; initialAction:string; onClose:()=>void
+  esAdmin:boolean; onChanged:()=>void; module:ModuleId; initialAction:string; onClose:()=>void; initialAnimalId?:number
 }){
+  const fieldId=useId()
   const allowed=getModuleActions(module,esAdmin)
   const action=initialAction
   const fixedCatalogType=action==='catalogo'
     ? module==='lotes'?'lote':module==='inventario'?'producto':module==='planes'?'plan_consumo':null
     :null
-  const initialValues=()=>({...base(),...(fixedCatalogType?{tipo:fixedCatalogType}:{})})
+  const initialValues=()=>({...base(),...(initialAnimalId?{animal_id:String(initialAnimalId)}:{}),...(fixedCatalogType?{tipo:fixedCatalogType}:{})})
   const [lists,setLists]=useState<Lists>({})
   const [values,setValues]=useState<Record<string,string>>(initialValues)
   const [selected,setSelected]=useState<number[]>([])
+  const [animalQuery,setAnimalQuery]=useState('')
   const [batchAnimals,setBatchAnimals]=useState<Record<string,unknown>[]>([])
   const [batchItems,setBatchItems]=useState<Record<string,unknown>[]>([])
   const [loading,setLoading]=useState(true)
@@ -191,7 +194,7 @@ export function OperationalModules({
     values.tipo==='proveedor'?[F('rut','RUT',undefined,'text',true),F('email','Email',undefined,'email',true)]:
     values.tipo==='plan_consumo'?[F('descripcion','Descripción',undefined,'text',true)]:
     values.tipo==='lote'?[F('fecha','Fecha',undefined,'date')]:[] :[]
-  function options(source:string){
+  function options(source:string):Opt[]{
     if(source==='tipo')return catalogs
     if(source==='estado_activo')return [{id:'SI',nombre:'Activo'},{id:'NO',nombre:'Inactivo'}]
     if(source==='modo_compra')return [{id:'SI',nombre:'Confirmar ahora: ingresar stock y actualizar PMP'},{id:'NO',nombre:'Enviar a Solicitudes pendientes: no ingresa inventario'}]
@@ -202,6 +205,11 @@ export function OperationalModules({
     if(source==='asignacion_plan_lote')return arr.filter(o=>o.activo!==false)
     if(source==='lote'||source==='animal')return arr.filter(o=>o.estado==='ACTIVO')
     return arr.filter(o=>o.activo!==false)
+  }
+  function animalDetail(o:Opt){
+    const raza=lists.raza?.find(r=>r.id===o.raza_id)?.nombre||'Sin raza'
+    const lote=lists.lote?.find(l=>l.id===o.lote_id)?.codigo||'—'
+    return `${raza} · Lote ${lote} · Valor base ${money(Number(o.precio_adquisicion??0))}`
   }
   function addLine(){
     setError('')
@@ -241,6 +249,9 @@ export function OperationalModules({
     if(action==='animalRectificar'&&(!values.animal_id||!['MACHO','HEMBRA'].includes(values.sexo)||(values.motivo||'').trim().length<5)){
       setError('Selecciona un animal y su sexo correcto. Explica el motivo con al menos 5 caracteres.');return
     }
+    if(S[action].fields.some(f=>f.source==='animal')&&!options('animal').some(o=>String(o.id)===values.animal_id)){setError('Selecciona una coincidencia de un animal activo.');return}
+    if(action==='fallecimiento'&&(values.motivo||'').trim().length<5){setError('Indica la causa del fallecimiento con al menos cinco caracteres.');return}
+    if(action==='division'&&selected.some(id=>!candidates.some(o=>Number(o.id)===id))){setError('Selecciona animales del lote de origen actual.');return}
     let details:ConfirmDetails|null=null
     if(action==='compraInsumo'){
       try {
@@ -258,7 +269,7 @@ export function OperationalModules({
         }
       }catch(e){setError(e instanceof Error?e.message:'Compra inválida');return}
     }else if(action==='fallecimiento'){
-      details={title:'Registrar fallecimiento',description:'El animal quedará identificado como fallecido y se descontará del conteo del lote. El historial se conservará.',confirmLabel:'Confirmar fallecimiento',danger:true}
+      details={title:'Registrar fallecimiento',description:'DIIO '+(lists.animal?.find(o=>String(o.id)===values.animal_id)?.diio||'')+' · Causa: '+values.motivo+'\nEl animal quedará identificado como fallecido y se descontará del conteo del lote. El historial se conservará.',confirmLabel:'Confirmar fallecimiento',danger:true}
     }else if(action==='ajuste'){
       details={title:'Aplicar ajuste al inventario',description:`Variación de ${values.delta||'0'} unidades. Motivo: ${values.motivo||'Sin motivo'}. Quedará registrada en el kardex y la auditoría.`,confirmLabel:'Aplicar ajuste',danger:n(values.delta||'0')<0}
     }else if(action==='venta'||action==='confirmarVenta'){
@@ -311,21 +322,23 @@ export function OperationalModules({
     <div className="max-w-3xl">
         <form onSubmit={submit} className="space-y-4">
           {S[action].fields.concat(more).map(f=>f.key==='tipo'&&fixedCatalogType?null:
-            <label key={f.key} className="block text-sm">
-              <span className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
+            <div key={f.key} className="block text-sm">
+              <label htmlFor={fieldId+f.key} className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
                 ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
-                :f.label}</span>
-              {f.source?
-                <select className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" disabled={loading||busy}
-                  required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&f.key==='producto_id') && !(action==='compraAnimal'&&batchAnimals.length>0&&['raza_id','sexo'].includes(f.key))} value={values[f.key]||''} onChange={e=>setValues({...values,[f.key]:e.target.value})}>
+                :f.label}</label>
+              {f.source==='animal'?
+                <AnimalSearch inputId={fieldId+f.key} options={options('animal').map(o=>({id:o.id,diio:o.diio||String(o.id),detail:animalDetail(o)}))}
+                  value={values[f.key]||''} onChange={id=>setValues(prev=>({...prev,[f.key]:id}))} disabled={loading||busy||Boolean(initialAnimalId)}/>:f.source?
+                <select id={fieldId+f.key} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" disabled={loading||busy}
+                  required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&f.key==='producto_id') && !(action==='compraAnimal'&&batchAnimals.length>0&&['raza_id','sexo'].includes(f.key))} value={values[f.key]||''} onChange={e=>{setValues({...values,[f.key]:e.target.value});if(action==='division'&&f.key==='lote_id'){setSelected([]);setAnimalQuery('')}}}>
                   <option value="">Seleccionar {f.optional?'(opcional)':''}</option>
                   {options(f.source).map(o=><option key={o.id} value={o.id}>{label(o,f.source!)}</option>)}
                 </select>:
-                <input className="w-full rounded-xl border border-slate-300 px-3 py-2.5" type={f.type==='number'?'text':f.type||'text'} inputMode={f.type==='number'?'decimal':undefined}
+                <input id={fieldId+f.key} className="w-full rounded-xl border border-slate-300 px-3 py-2.5" type={f.type==='number'?'text':f.type||'text'} inputMode={f.type==='number'?'decimal':undefined}
                   pattern={f.type==='number'?'-?[0-9]+([.,][0-9]+)?':undefined}
-                  disabled={busy} required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&['cantidad','precio'].includes(f.key)) && !(action==='compraAnimal'&&batchAnimals.length>0&&['diio','edad','precio'].includes(f.key))} minLength={action==='animalRectificar'&&f.key==='motivo'?5:undefined} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
-                  onChange={e=>setValues({...values,[f.key]:e.target.value})}/>}
-            </label>)}
+                  disabled={busy} required={!f.optional && !(action==='compraInsumo'&&batchItems.length>0&&['cantidad','precio'].includes(f.key)) && !(action==='compraAnimal'&&batchAnimals.length>0&&['diio','edad','precio'].includes(f.key))} minLength={(action==='animalRectificar'||action==='fallecimiento')&&f.key==='motivo'?5:undefined} value={values[f.key]??(f.type==='date'?fechaLocal():'')}
+                  onChange={e=>{setValues({...values,[f.key]:e.target.value});if(action==='division'&&f.key==='lote_id'){setSelected([]);setAnimalQuery('')}}}/>}
+            </div>)}
           {action==='compraInsumo'&&<div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
             <p className="font-semibold">Resumen de compra</p>
             <p className="mt-1">{precioPresentacion?'El precio ingresado corresponde a cada saco o presentación.':'El precio corresponde a cada unidad base del producto.'}</p>
@@ -353,12 +366,21 @@ export function OperationalModules({
           </div>}
           {(action==='venta'||action==='borradorVenta'||action==='division')&&<fieldset className="rounded-xl border border-slate-200 p-4">
             <legend className="px-2 text-sm font-semibold">Seleccionar animales ({selected.length})</legend>
+            <input aria-label="Buscar DIIO para seleccionar animales" placeholder="Escribe parte del DIIO" value={animalQuery}
+              disabled={busy} onChange={e=>setAnimalQuery(e.target.value)} className={boxClass+' mb-3'}/>
+            <p className="mb-3 text-xs text-slate-600">{selected.length} seleccionados · Valor base: {money(candidates.filter(o=>selected.includes(Number(o.id))).reduce((sum,o)=>sum+Number(o.precio_adquisicion??0),0))}</p>
             <div className="max-h-64 space-y-2 overflow-auto">
-              {candidates.map(o=><label key={o.id} className="flex items-center gap-3 rounded-lg p-2 text-sm hover:bg-slate-50">
-                <input type="checkbox" checked={selected.includes(Number(o.id))} onChange={e=>setSelected(e.target.checked?[...selected,Number(o.id)]:selected.filter(x=>x!==Number(o.id)))}/>
-                <span>{o.diio}</span><span className="ml-auto text-xs text-slate-500">Lote {o.lote_id}</span>
+              {candidates.filter(o=>o.diio?.includes(animalQuery.trim())).map(o=><label key={o.id} className="flex items-center gap-3 rounded-lg p-2 text-sm hover:bg-slate-50">
+                <input type="checkbox" disabled={busy} checked={selected.includes(Number(o.id))} onChange={e=>setSelected(e.target.checked?[...selected,Number(o.id)]:selected.filter(x=>x!==Number(o.id)))}/>
+                <span><span className="block font-mono font-semibold">{o.diio}</span><span className="text-xs text-slate-600">{animalDetail(o)}</span></span>
               </label>)}
+              {!candidates.some(o=>o.diio?.includes(animalQuery.trim()))&&<p className="p-3 text-sm text-slate-500">{action==='division'&&!values.lote_id?'Selecciona el lote de origen.':'No hay animales que coincidan.'}</p>}
             </div>
+            {selected.length>0&&<div className="mt-3 flex flex-wrap gap-2" aria-label="Animales seleccionados">
+              {candidates.filter(o=>selected.includes(Number(o.id))).map(o=><button type="button" key={o.id} disabled={busy}
+                onClick={()=>setSelected(ids=>ids.filter(id=>id!==Number(o.id)))} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+                aria-label={'Quitar DIIO '+o.diio}>{o.diio} ×</button>)}
+            </div>}
           </fieldset>}
           <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">Las operaciones producen cambios reales. Compras confirmadas, fallecimientos y ventas no admiten eliminación directa.</p>
           <button disabled={loading||busy} className="w-full rounded-xl bg-emerald-900 px-5 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">

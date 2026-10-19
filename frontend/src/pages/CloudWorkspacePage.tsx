@@ -9,6 +9,8 @@ import { SidebarNavigation, moduleTitles } from '../components/SidebarNavigation
 import { DomainRecords } from './DomainRecords'
 import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
+import { SupplyHistory } from './SupplyHistory'
+import { SupplyOperations, supplyActions } from './SupplyOperations'
 import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
 import { SipecSyncPreview } from './SipecSyncPreview'
@@ -18,7 +20,7 @@ import { MatusFooter } from '../components/MatusFooter'
 
 type Animal = AnimalRecord
 type Lote = { id: number; codigo: string; cantidad_actual: number; estado: string }
-type Producto = { id: number; nombre: string; stock_actual: number; stock_minimo: number; costo_promedio: number }
+type Producto = { id: number; nombre: string; stock_actual: number; stock_minimo: number; costo_promedio: number; tipo_insumo:string; unidad_medida:{codigo:string}|null }
 type Proveedor = { id: number; nombre: string }
 type CompraAnimal = { id: number; fecha: string; total: number; proveedor_id: number|null }
 type CompraInsumo = { id: number; proveedor_id: number; fecha: string; total: number; estado: string; numero_documento: string | null }
@@ -81,7 +83,7 @@ export function CloudWorkspacePage() {
         const [a, l, p, pr, ca, ci, da, di, ra] = await Promise.all([
           supabase.from('animal').select('id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones').order('diio').limit(1000),
           supabase.from('lote').select('id,codigo,cantidad_actual,estado').order('codigo').limit(500),
-          supabase.from('producto').select('id,nombre,stock_actual,stock_minimo,costo_promedio').order('nombre').limit(500),
+          supabase.from('producto').select('id,nombre,stock_actual,stock_minimo,costo_promedio,tipo_insumo,unidad_medida(codigo)').order('nombre').limit(500),
           supabase.from('proveedor').select('id,nombre').order('nombre').limit(200),
           supabase.from('compra_animal').select('id,fecha,total,proveedor_id').order('fecha', { ascending: false }).limit(300),
           supabase.from('compra_insumo').select('id,fecha,total,estado,numero_documento,proveedor_id').order('fecha', { ascending: false }).limit(300),
@@ -96,7 +98,7 @@ export function CloudWorkspacePage() {
             animales: (a.data ?? []) as Animal[],
             razas: ra.data??[],
             lotes: (l.data ?? []) as Lote[],
-            productos: (p.data ?? []) as Producto[],
+            productos: (p.data ?? []) as unknown as Producto[],
             proveedores: (pr.data ?? []) as Proveedor[],
             comprasAnimal: (ca.data ?? []) as CompraAnimal[],
             comprasInsumo: (ci.data ?? []) as CompraInsumo[],
@@ -123,7 +125,8 @@ export function CloudWorkspacePage() {
     (lotesPorId.get(a.lote_id) ?? '').toLowerCase().includes(buscar.toLowerCase())),
   )
   const listaProductos = (datos?.productos ?? []).filter(p => p.nombre.toLowerCase().includes(buscar.toLowerCase()))
-  const adquisiciones = (datos?.animales ?? []).reduce((s, a) => s + Number(a.precio_adquisicion), 0)
+  const bajas = (datos?.animales ?? []).filter(a=>a.estado==='FALLECIDO').reduce((s,a)=>s+Number(a.precio_adquisicion),0)
+  const adquisiciones = (datos?.animales ?? []).filter(a=>a.estado==='ACTIVO').reduce((s, a) => s + Number(a.precio_adquisicion), 0)
   const valorStock = (datos?.productos ?? []).reduce((s, p) => s + Number(p.stock_actual) * Number(p.costo_promedio), 0)
   const demo = (datos?.animales ?? []).some(a => a.diio.startsWith('DEMO-'))
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
@@ -207,7 +210,8 @@ export function CloudWorkspacePage() {
                 <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
                 <SaleIndividualPrices onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
-              {operation&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
+              {operation&&supplyActions.includes(operation)&&availableActions.some(item=>item.id===operation)&&<SupplyOperations key={operation} action={operation} onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
+              {operation&&!supplyActions.includes(operation)&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={closeOperation}/>}
             </section>}
@@ -216,17 +220,19 @@ export function CloudWorkspacePage() {
               <p className="mt-2 text-sm leading-6 text-slate-600">Registra razas, proveedores, categorías, unidades de medida, productos y otros catálogos desde «Crear nuevo registro». Estas acciones requieren permiso de administración.</p>
             </section>}
             {(tab==='ventas'||tab==='sanidad'||tab==='gastos')&&<DomainRecords module={tab} revision={revision}/>}
+            {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <PlansOverview />}
+            {tab === 'planes' && <PlansOverview key={revision} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
-            {tab === 'rentabilidad' && <ProfitabilityReport />}
+            {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
                   <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
-                  <Indicador nombre="Valor base del ganado" valor={formatoDinero(adquisiciones)} nota="Suma del valor inicial asignado a los animales" onClick={()=>abrirModulo("compras")} />
+                  <Indicador nombre="Valor base del ganado activo" valor={formatoDinero(adquisiciones)} nota="Adquisición de animales activos" onClick={()=>abrirModulo("compras")} />
+                  <Indicador nombre="Bajas por fallecimiento" valor={formatoDinero(bajas)} nota="Valor de adquisición · separado del ganado activo" onClick={()=>abrirModulo("animales","FALLECIDO")} />
                   <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
                 </div>
                 <div className="grid gap-5 lg:grid-cols-2">
@@ -305,7 +311,7 @@ export function CloudWorkspacePage() {
                       <table className="min-w-full text-left text-sm">
                         <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">Producto</th><th className="p-4">Existencia</th><th className="p-4">Mínimo</th><th className="p-4">PMP</th><th className="p-4">Valorización</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                          {listaProductos.map(p => <tr key={p.id} className="hover:bg-slate-50"><td className="p-4 font-semibold">{p.nombre}</td><td className="p-4">{formatoCantidad(p.stock_actual)}</td><td className="p-4">{formatoCantidad(p.stock_minimo)}</td><td className="p-4">{formatoDinero(p.costo_promedio)}</td><td className="p-4">{formatoDinero(p.stock_actual * p.costo_promedio)}</td></tr>)}
+                          {listaProductos.map(p => <tr key={p.id} className="hover:bg-slate-50"><td className="p-4 font-semibold">{p.nombre}</td><td className="p-4">{formatoCantidad(p.stock_actual)} {p.unidad_medida?.codigo}</td><td className="p-4">{formatoCantidad(p.stock_minimo)} {p.unidad_medida?.codigo}</td><td className="p-4">{formatoDinero(p.costo_promedio)}</td><td className="p-4">{formatoDinero(p.stock_actual * p.costo_promedio)}</td></tr>)}
                         </tbody>
                       </table>
                     )
@@ -336,7 +342,7 @@ export function CloudWorkspacePage() {
                   <div className="mt-4 space-y-3">
                     {datos.comprasInsumo.map(c => {
                       const lines=datos.detalleInsumos.filter(d=>d.compra_id===c.id)
-                      const provider=datos.proveedores.find(p=>p.id===c.proveedor_id)?.nombre??'Proveedor #'+c.proveedor_id
+                      const provider=datos.proveedores.find(p=>p.id===c.proveedor_id)?.nombre??'Proveedor sin especificar'
                       return <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
                         <div className="flex items-start justify-between gap-4"><div><div className="font-semibold">Compra de insumos #{c.id} · {provider}</div><div className="mt-1 text-xs text-slate-500">{c.fecha} · <span className={c.estado==='BORRADOR'?'font-semibold text-amber-800':'text-emerald-700'}>{c.estado==='BORRADOR'?'PENDIENTE':c.estado}</span> {c.numero_documento?'· '+c.numero_documento:''}</div></div><strong>{formatoDinero(c.total)}</strong></div>
                         <div className="mt-3 space-y-1">{lines.map(d=><p key={d.producto_id+'-'+d.subtotal} className="text-xs text-slate-600">

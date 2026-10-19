@@ -56,7 +56,7 @@ export function PlansOverview() {
     </header>
     {loading && <p className="p-6 text-sm text-slate-500">Cargando planes…</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-    {!loading && !error && planes.length === 0 && <p className="rounded-2xl bg-white p-8 text-sm text-slate-500">Todavía no existen planes. Puedes crearlos en Operaciones → Catálogos.</p>}
+    {!loading && !error && planes.length === 0 && <p className="rounded-2xl bg-white p-8 text-sm text-slate-500">Todavía no existen planes. Puedes crearlos en «Crear nuevo registro» en este módulo.</p>}
     {!loading && !error && planes.map(plan => {
       const lines = detalles.filter(d => d.plan_id === plan.id)
       const assigns = asignaciones.filter(a => a.plan_id === plan.id)
@@ -72,7 +72,7 @@ export function PlansOverview() {
         </summary>
         <div className="grid gap-6 border-t border-slate-100 p-5 sm:p-6 lg:grid-cols-2">
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Composición diaria</h4>
+            <h4 className="mb-3 text-sm font-semibold">Composición diaria por lote</h4>
             {lines.length === 0 ? <p className="text-sm text-slate-500">Sin productos definidos.</p> :
               <div className="space-y-2">{lines.map(line => <div key={line.id} className="flex justify-between gap-4 rounded-xl bg-slate-50 p-3 text-sm">
                 <span>{productName(line.producto_id)}</span><strong className="whitespace-nowrap">{Number(line.cantidad_diaria).toLocaleString('es-CL')} {unitName(line.unidad_id)}/día</strong>

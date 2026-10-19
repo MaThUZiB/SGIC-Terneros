@@ -70,7 +70,7 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
           <strong>{clp(item.monto)}</strong>
         </>}
         {module==='sanidad'&&<>
-          <div><p className="font-semibold text-slate-900">{label('animales',item.animal_id)} · {label('productos',item.producto_id)}</p>
+          <div><p className="font-semibold text-slate-900">{item.animal_id?label('animales',item.animal_id):'Lote '+label('lotes',item.lote_id)} · {label('productos',item.producto_id)}</p>
             <p className="mt-1 text-xs text-slate-500">{asText(item.fecha)} · {asText(item.motivo)}</p></div>
           <strong>{clp(item.costo_total)}</strong>
         </>}

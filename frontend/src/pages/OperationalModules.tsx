@@ -5,12 +5,16 @@ import { OperationConfirmDialog, type ConfirmDetails } from '../components/Opera
 import { AnimalSearch } from '../components/AnimalSearch'
 import { supabase } from '../api/supabase'
 
-type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number; raza_id?: number; precio_adquisicion?: number }
+type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number; raza_id?: number; precio_adquisicion?: number; apto_plan?:boolean }
 type Lists = Record<string, Opt[]>
 type Field = { key: string; label: string; source?: string; type?: string; optional?: boolean }
 type Spec = { title: string; role: 'ADMIN' | 'TODOS'; fields: Field[]; help: string }
 const F = (key: string, label: string, source?: string, type?: string, optional?: boolean): Field => ({key,label,source,type,optional})
 const S: Record<string, Spec> = {
+  ingresoInsumo:{title:'Ingresar insumos',role:'ADMIN',fields:[],help:''},
+  usoInsumo:{title:'Registrar uso',role:'TODOS',fields:[],help:''},
+  perdidaInsumo:{title:'Registrar pérdida',role:'TODOS',fields:[],help:''},
+  configInsumo:{title:'Uso en planes',role:'ADMIN',fields:[],help:''},
   compraAnimal: { title:'Compra / ingreso de ternero',role:'ADMIN',help:'DIIO único. Para agregar a lote existente, deja vacío el código de lote nuevo.',
     fields:[F('lote_id','Lote existente (opcional)','lote',undefined,true),F('lote_codigo','Código de lote nuevo',undefined,'text',true),F('proveedor_id','Proveedor','proveedor',undefined,true),
       F('diio','DIIO'),F('raza_id','Raza','raza'),F('sexo','Sexo','sexo'),F('edad','Edad aproximada (días)',undefined,'number'),F('precio','Costo adquisición (CLP)',undefined,'number'),F('peso','Peso inicial (kg)',undefined,'number',true),F('fecha','Fecha',undefined,'date')] },
@@ -28,7 +32,7 @@ const S: Record<string, Spec> = {
   confirmarVenta:{title:'Confirmar venta borrador',role:'ADMIN',help:'Congela el ingreso, los costos y los animales seleccionados. Es una operación irreversible.',fields:[F('venta_id','Borrador pendiente','venta')]},
   anularVenta:{title:'Anular venta borrador',role:'ADMIN',help:'Anula el borrador sin modificar el estado de los animales.',fields:[F('venta_id','Borrador pendiente','venta')]},
   venta: {title:'Confirmar venta por DIIO',role:'ADMIN',help:'Selecciona los animales exactos y registra ingreso y costos reconocidos. No se puede deshacer una venta confirmada.',fields:[F('comprador','Comprador',undefined,'text',true),F('total','Monto de venta (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
-  planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'La cantidad se expresa en la unidad base del producto.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria',undefined,'number')]},
+  planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'Cantidad total por lote y día, en la unidad base del insumo. Habilita insumos en Inventario → Uso en planes.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria total del lote',undefined,'number')]},
   consumoPlan:{title:'Ejecutar consumo desde plan',role:'TODOS',help:'Aplica el plan diario, descuenta stock y evita repetirlo en la misma fecha.',fields:[F('asignacion_id','Asignación vigente','asignacion_plan_lote'),F('fecha','Fecha',undefined,'date')]},
   asignarPlan:{title:'Asignar plan alimentario a lote',role:'ADMIN',help:'Asigna la alimentación planificada a un lote activo.',fields:[F('plan_id','Plan','plan_consumo'),F('lote_id','Lote','lote'),F('fecha','Fecha de inicio',undefined,'date')]},
   presentacion:{title:'Presentación comercial',role:'ADMIN',help:'Equivalencia entre envase comercial y unidad base del producto.',fields:[F('producto_id','Producto','producto'),F('nombre','Nombre de presentación'),F('cantidad','Cantidad en unidad base',undefined,'number')]},
@@ -40,8 +44,8 @@ const S: Record<string, Spec> = {
 const contextualActions: Partial<Record<ModuleId,string[]>> = {
   animales:['compraAnimal','peso','fallecimiento','animalRectificar'],
   lotes:['division','catalogo'],
-  inventario:['ajuste','presentacion','conversion','productoEditar','catalogo'],
-  compras:['compraInsumo'],
+  inventario:['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','productoEditar','ajuste'],
+  compras:['ingresoInsumo'],
   planes:['consumo','consumoPlan','planDetalle','asignarPlan','catalogo'],
   sanidad:['tratamiento'],
   ventas:['venta','borradorVenta'],
@@ -53,7 +57,7 @@ const contextualLabels:Record<string,string>={
   animalRectificar:'Rectificar',division:'Dividir lote',compraInsumo:'Comprar insumos',
   ajuste:'Ajustar stock',presentacion:'Crear presentación',conversion:'Crear conversión',
   productoEditar:'Editar producto',catalogo:'Crear nuevo registro',
-  consumo:'Registrar consumo',consumoPlan:'Aplicar plan',planDetalle:'Añadir alimento al plan',
+  consumo:'Registrar consumo',consumoPlan:'Confirmar alimentación del día',planDetalle:'Añadir alimento al plan',
   asignarPlan:'Asignar plan',tratamiento:'Registrar tratamiento',venta:'Registrar venta',
   borradorVenta:'Solicitar venta',gasto:'Registrar gasto',
 }
@@ -196,6 +200,7 @@ export function OperationalModules({
     values.tipo==='plan_consumo'?[F('descripcion','Descripción',undefined,'text',true)]:
     values.tipo==='lote'?[F('fecha','Fecha',undefined,'date')]:[] :[]
   function options(source:string):Opt[]{
+    if(source==='producto'&&action==='planDetalle')return (lists.producto??[]).filter(p=>p.activo&&p.apto_plan)
     if(source==='tipo')return catalogs
     if(source==='estado_activo')return [{id:'SI',nombre:'Activo'},{id:'NO',nombre:'Inactivo'}]
     if(source==='modo_compra')return [{id:'SI',nombre:'Confirmar ahora: ingresar stock y actualizar PMP'},{id:'NO',nombre:'Enviar a Solicitudes pendientes: no ingresa inventario'}]

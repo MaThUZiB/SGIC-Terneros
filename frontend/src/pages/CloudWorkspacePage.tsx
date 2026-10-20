@@ -1,3 +1,4 @@
+import { CatalogOverview } from './CatalogOverview'
 import { useWorkspaceNavigation } from '../hooks/useWorkspaceNavigation'
 import { TableScroll } from '../components/TableScroll'
 import { useEffect, useMemo, useState } from 'react'
@@ -59,7 +60,7 @@ function TablaVacia({ texto }: { texto: string }) {
 export function CloudWorkspacePage() {
   const { user, esAdmin, logout } = useAuth()
   const navigate = useNavigate()
-  const {tab,operation,animalCard,buscar,filtroAnimal,abrirModulo,setBuscar,setFiltroAnimal,
+  const {tab,operation,catalogType,animalCard,buscar,filtroAnimal,abrirModulo,setBuscar,setFiltroAnimal,
     openOperation,closeOperation,openAnimal,closeAnimal,setAnimalAction}=useWorkspaceNavigation()
   const [menuOpen,setMenuOpen] = useState(false)
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -190,7 +191,7 @@ export function CloudWorkspacePage() {
         {!error && datos && (
           <>
             {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+              {tab!=='catalogos'&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
                 <div>
                   <h2 className="text-sm font-semibold text-slate-900">Acciones de {moduleTitles[tab]}</h2>
                   <p className="mt-1 text-xs text-slate-500">Selecciona una acción para abrir su formulario aquí.</p>
@@ -205,20 +206,17 @@ export function CloudWorkspacePage() {
                     {item.label}
                   </button>)}
                 </div>
-              </div>
+              </div>}
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
                 <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
                 <SaleIndividualPrices onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
               {operation&&supplyActions.includes(operation)&&availableActions.some(item=>item.id===operation)&&<SupplyOperations key={operation} action={operation} onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
               {operation&&!supplyActions.includes(operation)&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
-                <OperationalModules key={tab+':'+operation} module={tab} initialAction={operation}
+                <OperationalModules key={tab+':'+operation+':'+catalogType} initialCatalogType={catalogType} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={closeOperation}/>}
             </section>}
-            {tab==='catalogos'&&<section className="rounded-2xl border border-slate-200 bg-white px-6 py-8">
-              <h2 className="text-lg font-semibold">Datos maestros</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Registra razas, proveedores, categorías, unidades de medida, productos y otros catálogos desde «Crear nuevo registro». Estas acciones requieren permiso de administración.</p>
-            </section>}
+            {tab==='catalogos'&&esAdmin&&!operation&&<CatalogOverview onCreate={type=>openOperation('catalogo',type)} onNavigate={abrirModulo}/>}
             {(tab==='ventas'||tab==='sanidad'||tab==='gastos')&&<DomainRecords module={tab} revision={revision}/>}
             {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}

@@ -62,3 +62,8 @@ input[type="checkbox"], input[type="radio"] { min-height: 22px; width: 22px; hei
   input:not([type="checkbox"]):not([type="radio"]), select { min-height: 44px; }
   button, a { touch-action: manipulation; }
 }
+
+/* Center the editing surface while keeping labels easy to scan. */
+.operation-panel { width: 100%; max-width: 48rem; margin-inline: auto; }
+.operation-panel-wide { max-width: 64rem; }
+@media (pointer: coarse) { .close-control { width: 44px; height: 44px; } }

@@ -1,3 +1,4 @@
+import { CloseButton } from '../components/CloseButton'
 import { TableScroll } from '../components/TableScroll'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import type { ModuleId } from '../components/SidebarNavigation'
@@ -159,15 +160,15 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
   return result.data
 }
 export function OperationalModules({
-  esAdmin, onChanged, module, initialAction, onClose, initialAnimalId,
+  esAdmin, onChanged, module, initialAction, onClose, initialAnimalId, initialCatalogType,
 }:{
-  esAdmin:boolean; onChanged:()=>void; module:ModuleId; initialAction:string; onClose:()=>void; initialAnimalId?:number
+  esAdmin:boolean; onChanged:()=>void; module:ModuleId; initialAction:string; onClose:()=>void; initialAnimalId?:number; initialCatalogType?:string|null
 }){
   const fieldId=useId()
   const allowed=getModuleActions(module,esAdmin)
   const action=initialAction
   const fixedCatalogType=action==='catalogo'
-    ? module==='lotes'?'lote':module==='inventario'?'producto':module==='planes'?'plan_consumo':null
+    ? module==='lotes'?'lote':module==='inventario'?'producto':module==='planes'?'plan_consumo':catalogs.some(c=>c.id===initialCatalogType)?initialCatalogType!:null
     :null
   const initialValues=()=>({...base(),...(initialAnimalId?{animal_id:String(initialAnimalId)}:{}),...(fixedCatalogType?{tipo:fixedCatalogType}:{})})
   const [lists,setLists]=useState<Lists>({})
@@ -308,30 +309,27 @@ export function OperationalModules({
   const candidates=(lists.animal||[]).filter(o=>o.estado==='ACTIVO'&&(action!=='division'||String(o.lote_id)===values.lote_id))
   if(!allowed.some(item=>item.id===action)) return null
   const panelTitle=action==='catalogo'&&fixedCatalogType
-    ?fixedCatalogType==='lote'?'Crear lote':fixedCatalogType==='producto'?'Crear producto':'Crear plan de alimentación'
+    ?'Crear '+(catalogs.find(c=>c.id===fixedCatalogType)?.nombre.toLocaleLowerCase()??'registro')
     :S[action].title
-  return <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-md shadow-emerald-900/5 sm:p-7" aria-label={panelTitle}>
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
-      <div>
-        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-emerald-700">Nueva operación · {panelTitle}</p>
+  const panelHelp=action==='catalogo'&&fixedCatalogType?({raza:'Agrega una raza para identificar los animales.',proveedor:'Guarda el nombre del proveedor. RUT y correo son opcionales.',categoria_gasto:'Crea una categoría para organizar los gastos del negocio.',unidad_medida:'Define la unidad y su abreviatura para medir existencias.',categoria_producto:'Agrega una clasificación para los insumos.',producto:'Crea un producto sin existencias. Para ingresar stock, utiliza Inventario.',plan_consumo:'Define el plan y luego añade los alimentos y sus cantidades diarias.',lote:'Crea un lote para agrupar los animales.'} as Record<string,string>)[fixedCatalogType]:S[action].help
+  return <section className="operation-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8" aria-label={panelTitle}>
+    <div className="mb-6 flex items-start justify-between gap-3 border-b border-slate-100 pb-5">
+      <div className="min-w-0">
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-widest text-slate-400">Nuevo registro</p>
         <h2 className="text-xl font-semibold tracking-tight text-slate-900">{panelTitle}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{S[action].help}</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{panelHelp}</p>
       </div>
-      <button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar formulario" title="Cerrar formulario"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50">
-        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-      </button>
+      <CloseButton onClick={onClose} disabled={busy}/>
     </div>
     {error&&<p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {ok&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{ok}</p>}
-    <div className="max-w-3xl">
+    <div className="mx-auto w-full max-w-2xl">
         <form onSubmit={submit} className="space-y-4">
           {S[action].fields.concat(more).map(f=>f.key==='tipo'&&fixedCatalogType?null:
             <div key={f.key} className="block text-sm">
               <label htmlFor={fieldId+f.key} className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
                 ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
-                :f.label}</label>
+                :action==='catalogo'&&fixedCatalogType&&f.key==='nombre'?(fixedCatalogType==='lote'?'Código del lote':'Nombre'):f.label}</label>
               {f.source==='animal'?
                 <AnimalSearch inputId={fieldId+f.key} options={options('animal').map(o=>({id:o.id,diio:o.diio||String(o.id),detail:animalDetail(o)}))}
                   value={values[f.key]||''} onChange={id=>setValues(prev=>({...prev,[f.key]:id}))} disabled={loading||busy||Boolean(initialAnimalId)}/>:f.source?
@@ -388,9 +386,9 @@ export function OperationalModules({
                 aria-label={'Quitar DIIO '+o.diio}>{o.diio} ×</button>)}
             </div>}
           </fieldset>}
-          <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">Las operaciones producen cambios reales. Compras confirmadas, fallecimientos y ventas no admiten eliminación directa.</p>
+          {action!=='catalogo'&&<p className="rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-500">El registro quedará en el historial. Compras confirmadas, fallecimientos y ventas no admiten eliminación directa.</p>}
           <button disabled={loading||busy} className="w-full rounded-xl bg-emerald-900 px-5 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-            {busy?'Registrando…':action==='compraInsumo'?(values.confirmar_ahora==='NO'?'Guardar borrador':'Comprar y actualizar inventario'):'Registrar operación'}
+            {busy?'Registrando…':action==='compraInsumo'?(values.confirmar_ahora==='NO'?'Guardar borrador':'Comprar y actualizar inventario'):action==='catalogo'?'Guardar registro':'Registrar operación'}
           </button>
         </form>
     </div>

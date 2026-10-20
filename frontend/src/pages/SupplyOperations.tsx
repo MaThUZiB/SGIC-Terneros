@@ -1,3 +1,4 @@
+import { CloseButton } from '../components/CloseButton'
 import { useEffect, useState, useId, Children, isValidElement, cloneElement, type ReactElement, type ReactNode, type FormEvent } from 'react'
 import { supabase } from '../api/supabase'
 import { AnimalSearch } from '../components/AnimalSearch'
@@ -53,6 +54,7 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
   try{
    let p:Record<string,unknown>={...v,solicitud:request}
    let description=''
+   let summary:ConfirmDetails['summary']
    if(plan){
     if(!assign||!details.length)throw Error('Selecciona una asignación con alimentos.')
     const rows=details.map(d=>({detalle_id:d.id,cantidad:num(amounts[d.id]??String(d.cantidad_diaria))}))
@@ -80,7 +82,9 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
      description=`${product!.nombre}: ${qty} ${unit(product)}\nCosto: ${money(qty*Number(product!.costo_promedio))}\nDestino: ${v.destino==='general'?'General del predio':v.destino==='animal'?lists.animal?.find(a=>String(a.id)===v.animal_id)?.diio:lists.lote?.find(l=>String(l.id)===v.lote_id)?.codigo}\n${v.finalidad==='PERDIDA'?'Se registra una pérdida.':'Se registra el uso.'} El stock se descontará una sola vez.`
     }
    }
-   setPayload(p);setConfirm({title:titles[action],description,confirmLabel:'Confirmar registro',danger:action==='perdidaInsumo'})
+   if(intake)summary=[{label:'Insumo',value:fresh?v.nombre:product?.nombre??''},{label:'Cantidad de ingreso',value:`${qty} ${pack?v.presentacion:stockUnit}`},{label:'Precio unitario',value:money(price??0)},...(pack?[{label:'Existencia que ingresa',value:`${base} ${stockUnit}`}]:[]),{label:'Total',value:money(total),emphasis:true}]
+   if(intake)description=v.tipo==='INICIAL'?'Se incorporará la existencia inicial con su valor, sin generar una compra.':'Se registrará la compra y se actualizarán las existencias.'
+   setPayload(p);setConfirm({summary,title:titles[action],description,confirmLabel:'Confirmar registro',danger:action==='perdidaInsumo'})
   }catch(e){setError(e instanceof Error?e.message:'Revisa los datos.')}
  }
  async function save(){
@@ -93,10 +97,10 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
   }catch(e){setConfirm(null);setError(e instanceof Error?e.message:'No se pudo registrar. Puedes reintentar sin duplicar el ingreso o uso.')}
   finally{setBusy(false)}
  }
- return <section className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-7">
-  <div className="mb-5 flex items-start justify-between gap-3"><div><h2 className="text-xl font-semibold">{titles[action]}</h2><p className="mt-2 text-sm text-slate-600">{intake?'Crea el insumo aquí mismo. Proveedor y presentación son opcionales.':plan?'Revisa lo realmente entregado al lote. Las cantidades son totales por lote y día.':config?'La categoría sugiere el uso, pero puedes habilitar un forraje u otro insumo para alimentación.':'Registra la cantidad utilizada y su destino. El costo queda asociado al lote o al predio.'}</p></div><button type="button" disabled={busy} onClick={onClose} className="rounded-xl border px-3 py-2" aria-label="Cerrar formulario">✕</button></div>
+ return <section className="operation-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+  <div className="mb-6 flex items-start justify-between gap-3 border-b border-slate-100 pb-5"><div className="min-w-0"><p className="mb-2 text-[11px] font-medium uppercase tracking-widest text-slate-400">Nuevo registro</p><h2 className="text-xl font-semibold">{titles[action]}</h2><p className="mt-2 text-sm text-slate-600">{intake?'Crea el insumo aquí mismo. Proveedor y presentación son opcionales.':plan?'Revisa lo realmente entregado al lote. Las cantidades son totales por lote y día.':config?'La categoría sugiere el uso, pero puedes habilitar un forraje u otro insumo para alimentación.':'Registra la cantidad utilizada y su destino. El costo queda asociado al lote o al predio.'}</p></div><CloseButton onClick={onClose} disabled={busy}/></div>
   {error&&<p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}{ok&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-emerald-900">{ok}</p>}
-  <form onSubmit={prepare}><fieldset disabled={busy||loading} className="max-w-2xl min-w-0 space-y-4">
+  <form onSubmit={prepare}><fieldset disabled={busy||loading} className="mx-auto w-full max-w-2xl min-w-0 space-y-5">
    {intake&&<><div className="grid grid-cols-2 gap-2">{[['COMPRA','Compra'],['INICIAL','Existencia inicial']].map(([id,label])=><button type="button" key={id} aria-pressed={v.tipo===id} onClick={()=>set('tipo',id)} className={'rounded-xl border p-3 text-sm '+(v.tipo===id?'bg-emerald-900 text-white':'bg-white')}>{label}</button>)}</div><label className="flex items-center gap-3 py-2"><input type="checkbox" checked={fresh} onChange={e=>{setFresh(e.target.checked);setEligible(e.target.checked?['LECHE','CONCENTRADO'].includes(v.tipo_insumo):product?.apto_plan??false)}}/> Crear un insumo nuevo</label></>}
    {!plan&&(!intake||!fresh)&&<div><p className="mb-2 text-sm font-medium">Insumo</p><AnimalSearch entity="insumo" options={products.map(p=>({id:p.id,diio:p.nombre!,detail:`${types[p.tipo_insumo??'OTRO']} · Disponible: ${p.stock_actual} ${unit(p)}`}))} value={v.producto_id??''} onChange={chooseProduct} disabled={busy||loading}/>{!loading&&!products.length&&<p className="mt-2 text-sm text-slate-600">Aún no hay insumos. {intake?'Marca «Crear un insumo nuevo».':'Registra primero un ingreso en Inventario.'}</p>}</div>}
    {intake&&fresh&&<>{input('nombre','Nombre del insumo')}<Field label="Tipo de insumo"><select className={cls} value={v.tipo_insumo} onChange={e=>{set('tipo_insumo',e.target.value);setEligible(['LECHE','CONCENTRADO'].includes(e.target.value));set('unidad',e.target.value==='CAMA'?'bolo':e.target.value==='MEDICAMENTO'?'ml':'kg')}}>{Object.entries(types).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field>{select('unidad','Unidad para controlar existencias',[{id:'kg',label:'Kilogramos (kg)'},{id:'l',label:'Litros (l)'},{id:'ml',label:'Mililitros (ml)'},{id:'unidad',label:'Unidades'},{id:'bolo',label:'Bolos'}])}</>}

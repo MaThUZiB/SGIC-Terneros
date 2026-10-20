@@ -1,3 +1,4 @@
+import { CloseButton } from '../components/CloseButton'
 import { useEffect, useRef, useState } from 'react'
 import { OperationalModules } from './OperationalModules'
 
@@ -16,13 +17,13 @@ export function AnimalCard({animal,raza,lote,esAdmin,action,onAction,onClose,onC
   function setAction(value:string|null){setNotice('');onAction(value)}
   const heading=useRef<HTMLHeadingElement>(null)
   useEffect(()=>{heading.current?.focus()},[])
-  return <section aria-label={'Ficha del ternero '+animal.diio} className="space-y-5 rounded-2xl border border-emerald-300 bg-white p-5 shadow-sm sm:p-7">
+  return <section aria-label={'Ficha del ternero '+animal.diio} className="operation-panel operation-panel-wide space-y-5 rounded-2xl border border-slate-300 bg-white p-5 shadow-sm sm:p-7">
     <div className="flex items-start justify-between gap-4">
       <div><p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Ficha individual</p>
         <h2 ref={heading} tabIndex={-1} className="mt-2 text-xl font-semibold outline-none">Ternero · {animal.diio}</h2>
         <p className={'mt-2 text-sm font-semibold '+(animal.estado==='FALLECIDO'?'text-rose-700':'text-slate-700')}>{animal.estado}</p>
       </div>
-      <button type="button" onClick={onClose} disabled={Boolean(action)} aria-label="Cerrar ficha del ternero" className="rounded-lg border px-3 py-2 disabled:opacity-50">Cerrar ×</button>
+      <CloseButton onClick={onClose} disabled={Boolean(action)} label="Cerrar ficha del ternero"/>
     </div>
     <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {Object.entries({'Raza':raza,'Lote':lote,'Sexo':animal.sexo,'Valor base / adquisición':money(animal.precio_adquisicion),

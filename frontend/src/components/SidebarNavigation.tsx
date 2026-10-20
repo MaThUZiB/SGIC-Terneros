@@ -28,7 +28,7 @@ export const navigationGroups: NavigationGroup[] = [
     {id:'rentabilidad',title:'Rentabilidad',icon:'chart'},
   ]},
   { label:'Administración',entries:[
-    {id:'catalogos',title:'Catálogos',icon:'settings',adminOnly:true},
+    {id:'catalogos',title:'Configuración',icon:'settings',adminOnly:true},
     {id:'historial',title:'Historial y auditoría',icon:'history'},
     {id:'usuarios',title:'Usuarios',icon:'users',adminOnly:true},
   ]},

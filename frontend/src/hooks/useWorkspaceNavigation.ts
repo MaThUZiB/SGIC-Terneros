@@ -41,14 +41,14 @@ export function useWorkspaceNavigation(){
   }
   function abrirModulo(modulo:ModuleId,estado?:AnimalFilter,busqueda=''){
     change({modulo:modulo==='resumen'?null:modulo,estado:estado&&estado!=='TODOS'?estado:null,
-      buscar:busqueda||null,animal:null,accion:null,operacion:null})
+      buscar:busqueda||null,animal:null,accion:null,operacion:null,catalogo:null})
   }
-  return {tab,operation,animalCard,buscar,filtroAnimal,abrirModulo,
+  return {tab,operation,catalogType:params.get('catalogo'),animalCard,buscar,filtroAnimal,abrirModulo,
     setBuscar:(value:string)=>change({buscar:value||null},true),
     setFiltroAnimal:(value:AnimalFilter)=>change({estado:value==='TODOS'?null:value}),
-    openOperation:(value:string)=>change({operacion:value,animal:null,accion:null}),
-    closeOperation:()=>close({operacion:null}),
-    openAnimal:(value:number)=>change({animal:String(value),accion:null,operacion:null}),
+    openOperation:(value:string,catalogType?:string)=>change({operacion:value,catalogo:catalogType??null,animal:null,accion:null}),
+    closeOperation:()=>close({operacion:null,catalogo:null}),
+    openAnimal:(value:number)=>change({animal:String(value),accion:null,operacion:null,catalogo:null}),
     closeAnimal:()=>close({animal:null,accion:null}),
     setAnimalAction:(value:string|null,replace=false)=>value||replace?change({accion:value},replace):close({accion:null}),
   }

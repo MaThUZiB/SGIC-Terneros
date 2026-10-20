@@ -1,3 +1,4 @@
+import { CloseButton } from '../components/CloseButton'
 import { TableScroll } from '../components/TableScroll'
 import { useId, useMemo, useState, type ChangeEvent } from 'react'
 import { supabase } from '../api/supabase'
@@ -115,7 +116,7 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
     setFilter('existentes')
   }
 
-  return <section aria-label="Sincronizar con SIPECweb" className="space-y-5 rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
+  return <section aria-label="Sincronizar con SIPECweb" className="operation-panel operation-panel-wide space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
       <div>
         <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Animales · Conciliación con SAG</p>
@@ -125,10 +126,7 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
           Revisa los DIIO, completa sus valores y confirma para guardar los animales en SGIC.
         </p>
       </div>
-      <button type="button" onClick={onClose} disabled={busy||incorporando} aria-label="Cerrar sincronización" title="Cerrar"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50">
-        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
+      <CloseButton onClick={onClose} disabled={busy||incorporando} label="Cerrar sincronización"/>
     </div>
 
     <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
@@ -153,7 +151,7 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
       <p role="status" className="text-sm font-semibold text-emerald-900">{success}</p>
       <p className="text-sm text-slate-700">Continúa con los productos y sus unidades en Catálogos, registra las compras de insumos y luego los consumos en Alimentación.</p>
       <div className="flex flex-wrap gap-2">
-        {([{id:'animales',label:'Ver animales guardados'},{id:'catalogos',label:'1. Preparar productos'},
+        {([{id:'animales',label:'Ver animales guardados'},{id:'inventario',label:'1. Ingresar insumos'},
           {id:'compras',label:'2. Registrar insumos'},{id:'planes',label:'3. Alimentación'}] as const).map(step=>
           <button key={step.id} type="button" onClick={()=>onNavigate(step.id)}
             className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-900">{step.label}</button>)}

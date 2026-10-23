@@ -47,7 +47,7 @@ const contextualActions: Partial<Record<ModuleId,string[]>> = {
   lotes:['division','catalogo'],
   inventario:['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','productoEditar','ajuste'],
   compras:['ingresoInsumo'],
-  planes:['consumo','consumoPlan','planDetalle','asignarPlan','catalogo'],
+  planes:['consumo','consumoPlan','planDetalle','catalogo'],
   sanidad:['tratamiento'],
   ventas:['venta','borradorVenta'],
   gastos:['gasto'],

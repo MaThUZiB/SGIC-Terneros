@@ -34,8 +34,8 @@ async function paginar(tabla:'consumo'|'detalle_consumo',columnas:string){
   return {datos,limitado:true}
 }
 
-export function PlansOverview({esAdmin=false,initialLoteId,onChanged,onConfirmDaily}:{
-  esAdmin?:boolean;initialLoteId?:number|null;onChanged?:()=>void;
+export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfirmDaily}:{
+  esAdmin?:boolean;initialLoteId?:number|null;onSelectLote?:(loteId:number)=>void;
   onConfirmDaily?:(asignacionId:number)=>void
 }){
   const [planes,setPlanes]=useState<Plan[]>([])
@@ -144,7 +144,6 @@ export function PlansOverview({esAdmin=false,initialLoteId,onChanged,onConfirmDa
       setConfirmacion(null);setNuevoPlan('')
       setAviso(cambio.kind==='assign'?'Asignación actualizada. El historial anterior se conserva.':'Plan desasignado. No se alteró el inventario ni los consumos anteriores.')
       await cargar()
-      onChanged?.()
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el cambio.')}
     finally{setBusy(false)}
   }
@@ -176,7 +175,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onChanged,onConfirmDa
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0 flex-1">
             <label htmlFor="seguimiento-lote" className="mb-2 block text-sm font-semibold">Seguimiento del lote</label>
-            <select id="seguimiento-lote" className={control+' max-w-lg'} value={seleccion} onChange={e=>{setSeleccion(e.target.value);setNuevoPlan('');setError('');setAviso('')}}>
+            <select id="seguimiento-lote" className={control+' max-w-lg'} value={seleccion} onChange={e=>{setSeleccion(e.target.value);onSelectLote?.(Number(e.target.value));setNuevoPlan('');setError('');setAviso('')}}>
               {lotes.length===0&&<option value="">Sin lotes</option>}
               {lotes.map(x=><option key={x.id} value={x.id}>{x.codigo} · {x.cantidad_actual} animales · {x.estado==='ACTIVO'?'Activo':'Cerrado'}</option>)}
             </select>

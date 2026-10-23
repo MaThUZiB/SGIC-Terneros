@@ -67,6 +67,7 @@ export function CloudWorkspacePage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+  const [supplyNotice,setSupplyNotice]=useState<{module:'compras'|'inventario';message:string}|null>(null)
 
   useEffect(() => {
     let vigente = true
@@ -185,6 +186,7 @@ export function CloudWorkspacePage() {
           {demo&&<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-950">
             <strong>Entorno de demostración.</strong> Los registros DEMO son ficticios y no corresponden a operaciones empresariales reales.
           </div>}
+        {supplyNotice?.module===tab&&<div role="status" className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-950"><span>{supplyNotice.message}</span><button type="button" className="shrink-0 font-semibold underline" onClick={()=>setSupplyNotice(null)}>Cerrar aviso</button></div>}
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
         {cargando && !datos && <div className="py-14 text-center text-sm text-slate-500">Cargando información desde Supabase…</div>}
 
@@ -211,7 +213,7 @@ export function CloudWorkspacePage() {
                 <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
                 <SaleIndividualPrices onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
-              {operation&&supplyActions.includes(operation)&&availableActions.some(item=>item.id===operation)&&<SupplyOperations key={operation} action={operation} onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
+              {operation&&supplyActions.includes(operation)&&availableActions.some(item=>item.id===operation)&&<SupplyOperations key={operation} action={operation} onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onCompleted={module=>{setSupplyNotice({module,message:module==='compras'?'Compra de insumos guardada. El inventario y el historial de compras se actualizaron.':'Existencia inicial registrada. El inventario ya refleja el ingreso.'});abrirModulo(module)}}/>}
               {operation&&!supplyActions.includes(operation)&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation+':'+catalogType} initialCatalogType={catalogType} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={closeOperation}/>}

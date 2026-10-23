@@ -70,6 +70,8 @@ export function CloudWorkspacePage() {
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
   const [supplyNotice,setSupplyNotice]=useState<{module:'compras'|'inventario';message:string}|null>(null)
+  const [seguimientoLoteId,setSeguimientoLoteId]=useState<number|null>(null)
+  const [asignacionDiaId,setAsignacionDiaId]=useState<number|null>(null)
 
   useEffect(() => {
     let vigente = true
@@ -213,7 +215,7 @@ export function CloudWorkspacePage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {visibleActions.map(item=><button type="button" key={item.id}
-                    onClick={()=>operation===item.id?closeOperation():openOperation(item.id)}
+                    onClick={()=>{if(item.id==='consumoPlan')setAsignacionDiaId(null);operation===item.id?closeOperation():openOperation(item.id)}}
                     aria-expanded={operation===item.id}
                     className={`rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${operation===item.id
                       ?'border-emerald-800 bg-emerald-800 text-white'
@@ -226,7 +228,7 @@ export function CloudWorkspacePage() {
                 <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
                 <SaleIndividualPrices onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)}/>}
-              {operation&&supplyActions.includes(operation)&&availableActions.some(item=>item.id===operation)&&<SupplyOperations key={operation} action={operation} onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onCompleted={module=>{setSupplyNotice({module,message:module==='compras'?'Compra de insumos guardada. El inventario y el historial de compras se actualizaron.':'Existencia inicial registrada. El inventario ya refleja el ingreso.'});abrirModulo(module)}}/>}
+              {operation&&supplyActions.includes(operation)&&availableActions.some(item=>item.id===operation)&&<SupplyOperations key={operation+':'+String(asignacionDiaId)} action={operation} initialAsignacionId={operation==='consumoPlan'?asignacionDiaId:null} onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onCompleted={module=>{setSupplyNotice({module,message:module==='compras'?'Compra de insumos guardada. El inventario y el historial de compras se actualizaron.':'Existencia inicial registrada. El inventario ya refleja el ingreso.'});abrirModulo(module)}}/>}
               {operation&&!supplyActions.includes(operation)&&operation!=='sipecSync'&&operation!=='ventaIndividual'&&availableActions.some(item=>item.id===operation)&&
                 <OperationalModules key={tab+':'+operation+':'+catalogType} initialCatalogType={catalogType} module={tab} initialAction={operation}
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={closeOperation}/>}
@@ -236,7 +238,7 @@ export function CloudWorkspacePage() {
             {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <PlansOverview key={revision} />}
+            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onChanged={()=>setRevision(x=>x+1)} onConfirmDaily={id=>{setAsignacionDiaId(id);openOperation('consumoPlan')}} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (
@@ -289,6 +291,7 @@ export function CloudWorkspacePage() {
                   <p className="text-sm text-slate-500">animales registrados actualmente</p>
                   <button type="button" onClick={()=>abrirModulo('animales','TODOS',l.codigo)}
                     className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales del lote →</button>
+                  <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline">Seguimiento alimentario →</button>
                 </article>)}
                 {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
               </div>

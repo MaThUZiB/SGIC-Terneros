@@ -11,6 +11,8 @@ import { DomainRecords } from './DomainRecords'
 import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
 import { SupplyHistory } from './SupplyHistory'
+import { StockPresentations } from '../components/StockPresentations'
+import type { PresentacionStock } from '../utils/presentationStock'
 import { SupplyOperations, supplyActions } from './SupplyOperations'
 import { PlansOverview } from './PlansOverview'
 import { PendingRequests } from './PendingRequests'
@@ -28,7 +30,7 @@ type CompraInsumo = { id: number; proveedor_id: number; fecha: string; total: nu
 type DetalleCompraAnimal = { compra_id:number; animal_id:number }
 type DetalleCompraInsumo = { compra_id:number; producto_id:number; cantidad:number; cantidad_base:number; subtotal:number }
 type Datos = {
-  animales: Animal[]; razas: {id:number;nombre:string}[]; lotes: Lote[]; productos: Producto[]
+  animales: Animal[]; razas: {id:number;nombre:string}[]; lotes: Lote[]; productos: Producto[]; presentaciones: PresentacionStock[]
   proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]; detalleAnimales: DetalleCompraAnimal[]; detalleInsumos: DetalleCompraInsumo[]
 }
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
@@ -82,7 +84,7 @@ export function CloudWorkspacePage() {
       setCargando(true)
       setError('')
       try {
-        const [a, l, p, pr, ca, ci, da, di, ra] = await Promise.all([
+        const [a, l, p, pr, ca, ci, da, di, ra, pp] = await Promise.all([
           supabase.from('animal').select('id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones').order('diio').limit(1000),
           supabase.from('lote').select('id,codigo,cantidad_actual,estado').order('codigo').limit(500),
           supabase.from('producto').select('id,nombre,stock_actual,stock_minimo,costo_promedio,tipo_insumo,unidad_medida(codigo)').order('nombre').limit(500),
@@ -92,8 +94,9 @@ export function CloudWorkspacePage() {
           supabase.from('detalle_compra_animal').select('compra_id,animal_id').limit(1000),
           supabase.from('detalle_compra_insumo').select('compra_id,producto_id,cantidad,cantidad_base,subtotal').limit(1000),
           supabase.from('raza').select('id,nombre').order('nombre').limit(1000),
+          supabase.from('presentacion_producto').select('id,producto_id,nombre,cantidad_base,activa').eq('activa',true).order('id',{ascending:false}).limit(1000),
         ])
-        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error, da.error, di.error, ra.error].find(Boolean)
+        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error, da.error, di.error, ra.error, pp.error].find(Boolean)
         if (fallo) throw new Error(fallo.message)
         if (vigente) {
           setDatos({
@@ -101,6 +104,7 @@ export function CloudWorkspacePage() {
             razas: ra.data??[],
             lotes: (l.data ?? []) as Lote[],
             productos: (p.data ?? []) as unknown as Producto[],
+            presentaciones: (pp.data ?? []) as PresentacionStock[],
             proveedores: (pr.data ?? []) as Proveedor[],
             comprasAnimal: (ca.data ?? []) as CompraAnimal[],
             comprasInsumo: (ci.data ?? []) as CompraInsumo[],
@@ -127,6 +131,15 @@ export function CloudWorkspacePage() {
     (lotesPorId.get(a.lote_id) ?? '').toLowerCase().includes(buscar.toLowerCase())),
   )
   const listaProductos = (datos?.productos ?? []).filter(p => p.nombre.toLowerCase().includes(buscar.toLowerCase()))
+  const presentacionesPorProducto = useMemo(() => {
+    const agrupadas = new Map<number, PresentacionStock[]>()
+    for (const presentacion of datos?.presentaciones ?? []) {
+      const lista = agrupadas.get(presentacion.producto_id) ?? []
+      lista.push(presentacion)
+      agrupadas.set(presentacion.producto_id, lista)
+    }
+    return agrupadas
+  }, [datos])
   const bajas = (datos?.animales ?? []).filter(a=>a.estado==='FALLECIDO').reduce((s,a)=>s+Number(a.precio_adquisicion),0)
   const adquisiciones = (datos?.animales ?? []).filter(a=>a.estado==='ACTIVO').reduce((s, a) => s + Number(a.precio_adquisicion), 0)
   const valorStock = (datos?.productos ?? []).reduce((s, p) => s + Number(p.stock_actual) * Number(p.costo_promedio), 0)
@@ -286,7 +299,7 @@ export function CloudWorkspacePage() {
             {(tab === 'animales' || tab === 'inventario') && (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2><p className="mt-1 text-xs text-slate-500">Consultar registros y movimientos</p></div>
+                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2><p className="mt-1 text-xs text-slate-500">{tab === 'inventario' ? 'Cantidades en unidad base y equivalencias comerciales (no un conteo de envases sellados).' : 'Consultar registros y movimientos'}</p></div>
                   <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
                 </div>
@@ -311,7 +324,7 @@ export function CloudWorkspacePage() {
                       <table className="min-w-full text-left text-sm">
                         <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">Producto</th><th className="p-4">Existencia</th><th className="p-4">Mínimo</th><th className="p-4">PMP</th><th className="p-4">Valorización</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                          {listaProductos.map(p => <tr key={p.id} className="hover:bg-slate-50"><td className="p-4 font-semibold">{p.nombre}</td><td className="p-4">{formatoCantidad(p.stock_actual)} {p.unidad_medida?.codigo}</td><td className="p-4">{formatoCantidad(p.stock_minimo)} {p.unidad_medida?.codigo}</td><td className="p-4">{formatoDinero(p.costo_promedio)}</td><td className="p-4">{formatoDinero(p.stock_actual * p.costo_promedio)}</td></tr>)}
+                          {listaProductos.map(p => <tr key={p.id} className="hover:bg-slate-50"><td className="p-4 font-semibold">{p.nombre}</td><td className="p-4"><div className="font-semibold">{formatoCantidad(p.stock_actual)} {p.unidad_medida?.codigo}</div><StockPresentations stock={Number(p.stock_actual)} unidad={p.unidad_medida?.codigo ?? 'unidad'} presentaciones={presentacionesPorProducto.get(p.id) ?? []}/></td><td className="p-4">{formatoCantidad(p.stock_minimo)} {p.unidad_medida?.codigo}</td><td className="p-4">{formatoDinero(p.costo_promedio)}</td><td className="p-4">{formatoDinero(p.stock_actual * p.costo_promedio)}</td></tr>)}
                         </tbody>
                       </table>
                     )

@@ -5,7 +5,7 @@ import { AnimalSearch } from '../components/AnimalSearch'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { parseClpAmount } from '../utils/clpInput'
 
-type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string }
+type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
 type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
 export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','consumoPlan','tratamiento','consumo']
@@ -16,9 +16,9 @@ const num=(s:string)=>/^\d+([.,]\d{1,3})?$/.test(s)?Number(s.replace(',','.')):N
 const cls='w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3'
 function Field({label,children}:{label:string;children:ReactNode}){const id=useId();return <div className="block min-w-0 space-y-1.5 text-sm"><label htmlFor={id} className="block font-medium">{label}</label>{Children.map(children,(child,i)=>i===0&&isValidElement(child)?cloneElement(child as ReactElement<{id?:string}>,{id}):child)}</div>}
 
-export function SupplyOperations({action,onClose,onChanged,onCompleted}:{action:string;onClose:()=>void;onChanged:()=>void;onCompleted?:(module:'compras'|'inventario')=>void}){
+export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAsignacionId}:{action:string;onClose:()=>void;onChanged:()=>void;onCompleted?:(module:'compras'|'inventario')=>void;initialAsignacionId?:number|null}){
  const [lists,setLists]=useState<Record<string,Row[]>>({})
- const [v,setV]=useState<Record<string,string>>({fecha:today(),tipo:'COMPRA',unidad:'kg',tipo_insumo:'LECHE',factor:'1',finalidad:action==='perdidaInsumo'?'PERDIDA':action==='tratamiento'?'TRATAMIENTO':'ALIMENTACION',destino:action==='tratamiento'?'animal':'lote'})
+ const [v,setV]=useState<Record<string,string>>({fecha:today(),tipo:'COMPRA',unidad:'kg',tipo_insumo:'LECHE',factor:'1',finalidad:action==='perdidaInsumo'?'PERDIDA':action==='tratamiento'?'TRATAMIENTO':'ALIMENTACION',destino:action==='tratamiento'?'animal':'lote',...(initialAsignacionId?{asignacion_id:String(initialAsignacionId)}:{})})
  const [fresh,setFresh]=useState(false),[pack,setPack]=useState(false),[eligible,setEligible]=useState(true)
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[ok,setOk]=useState('')
  const [request,setRequest]=useState(()=>crypto.randomUUID())
@@ -74,7 +74,7 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted}:{action:
  },[intake,fresh,v.producto_id,lists.presentacion_producto])
 
  const assign=lists.asignacion_plan_lote?.find(a=>String(a.id)===v.asignacion_id)
- const details=(lists.detalle_plan_consumo??[]).filter(d=>d.plan_id===assign?.plan_id)
+ const details=assign?.componentes??(lists.detalle_plan_consumo??[]).filter(d=>d.plan_id===assign?.plan_id)
  const qty=num(v.cantidad??''),factor=pack?num(v.factor??''):1
  const price=v.precio==='0'?0:parseClpAmount(v.precio??'')
  const base=qty*factor, total=qty*(price??NaN)

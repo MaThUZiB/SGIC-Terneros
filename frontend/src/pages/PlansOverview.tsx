@@ -12,7 +12,7 @@ type Detail = ComponentePlan & {plan_id:number}
 type Producto = { id:number; nombre:string }
 type Unidad = { id:number; nombre:string; codigo:string }
 type Lote = { id:number; codigo:string; cantidad_actual:number; cantidad_original:number; estado:string }
-type Confirmacion = { kind:'assign'|'unassign'; details:ConfirmDetails; planId?:number; loteId:number }
+type Confirmacion = { kind:'assign'|'unassign'|'manage'; details:ConfirmDetails; planId?:number; loteId:number; accion?:'ELIMINAR'|'ARCHIVAR'|'REACTIVAR' }
 const hoy=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'})
 const clp=(n:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n)
 const cantidad=(n:number)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:3}).format(n)
@@ -132,6 +132,24 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
       summary:[{label:'Lote',value:lote.codigo},{label:'Plan a finalizar',value:planNombre(vigente.plan_id)}]
     }})
   }
+  function solicitarGestionPlan(p:Plan,accion:'ELIMINAR'|'ARCHIVAR'|'REACTIVAR'){
+    const asignados=asignaciones.filter(a=>a.plan_id===p.id)
+    const activos=asignados.filter(a=>a.activo)
+    if(accion==='ELIMINAR'&&asignados.length)return setError('Este plan tiene historial de asignaciones. Solo puede archivarse.')
+    if(accion==='ARCHIVAR'&&activos.length)return setError('Primero cambia o desasigna el plan de los lotes que lo utilizan.')
+    setError('');setAviso('')
+    setConfirmacion({kind:'manage',loteId:0,planId:p.id,accion,details:{
+      title:accion==='ELIMINAR'?'Eliminar plan definitivamente':accion==='ARCHIVAR'?'Archivar plan':'Reactivar plan',
+      description:accion==='ELIMINAR'
+        ?'Se borrará el plan del catálogo y sus ingredientes. Esta acción no se puede deshacer y solo está permitida si nunca se asignó a un lote.'
+        :accion==='ARCHIVAR'
+        ?'El plan dejará de aparecer como opción para nuevas asignaciones. Conservarás su historial y los consumos de los lotes.'
+        :'El plan volverá a estar disponible para nuevas asignaciones. No cambia ninguna asignación existente.',
+      confirmLabel:accion==='ELIMINAR'?'Eliminar definitivamente':accion==='ARCHIVAR'?'Archivar plan':'Reactivar plan',
+      danger:accion==='ELIMINAR',
+      summary:[{label:'Plan',value:p.nombre},{label:'Asignaciones históricas',value:String(asignados.length)}]
+    }})
+  }
   async function ejecutar(){
     if(!supabase||busy||!confirmacion)return
     setBusy(true);setError('')
@@ -139,10 +157,12 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
       const cambio=confirmacion
       const rpc=cambio.kind==='assign'
         ?await supabase.rpc('sgic_asignar_plan',{p_lote_id:cambio.loteId,p_plan_id:cambio.planId!,p_inicio:hoy()})
-        :await supabase.rpc('sgic_desasignar_plan',{p_lote_id:cambio.loteId,p_fecha:hoy()})
+        :cambio.kind==='unassign'
+        ?await supabase.rpc('sgic_desasignar_plan',{p_lote_id:cambio.loteId,p_fecha:hoy()})
+        :await supabase.rpc('sgic_gestionar_plan',{p_plan_id:cambio.planId!,p_accion:cambio.accion!})
       if(rpc.error)throw rpc.error
       setConfirmacion(null);setNuevoPlan('')
-      setAviso(cambio.kind==='assign'?'Asignación actualizada. El historial anterior se conserva.':'Plan desasignado. No se alteró el inventario ni los consumos anteriores.')
+      setAviso(cambio.kind==='assign'?'Asignación actualizada. El historial anterior se conserva.':cambio.kind==='unassign'?'Plan desasignado. No se alteró el inventario ni los consumos anteriores.':cambio.accion==='ELIMINAR'?'Plan eliminado.':cambio.accion==='ARCHIVAR'?'Plan archivado.':'Plan reactivado.')
       await cargar()
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el cambio.')}
     finally{setBusy(false)}
@@ -295,6 +315,10 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
             <summary className="cursor-pointer text-sm font-semibold">{p.nombre} <span className="ml-2 text-xs font-normal text-slate-500">{p.activo?'Activo':'Inactivo'}</span></summary>
             <p className="mt-2 text-xs text-slate-600">{p.descripcion??'Sin descripción'}</p>
             <div className="mt-3 space-y-1 text-xs text-slate-700">{detalles.filter(d=>d.plan_id===p.id).map(d=><p key={d.id}>{productoNombre(d.producto_id)} · {cantidad(Number(d.cantidad_diaria))} {unidadNombre(d.unidad_id)}/día</p>)}</div>
+            {esAdmin&&<div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
+              {p.activo?<button type="button" disabled={busy||asignaciones.some(a=>a.plan_id===p.id&&a.activo)} onClick={()=>solicitarGestionPlan(p,'ARCHIVAR')} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Archivar</button>:<button type="button" disabled={busy} onClick={()=>solicitarGestionPlan(p,'REACTIVAR')} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800">Reactivar</button>}
+              {asignaciones.every(a=>a.plan_id!==p.id)&&<button type="button" disabled={busy} onClick={()=>solicitarGestionPlan(p,'ELIMINAR')} className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800">Eliminar</button>}
+            </div>}
           </details>)}</div>}
       </section>
     </>}

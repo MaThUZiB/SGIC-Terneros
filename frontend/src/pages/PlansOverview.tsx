@@ -148,6 +148,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onChanged,onConfirmDa
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el cambio.')}
     finally{setBusy(false)}
   }
+  const confirmacionHoy=Boolean(vigente)&&consumos.some(c=>c.lote_id===lote?.id&&c.fecha===hoy()&&c.origen==='PLAN')
   const planActivoLote=vigente?planes.find(p=>p.id===vigente.plan_id):null
   const componentesVigentes=vigente?.componentes??[]
   const totalLotesConPlan=new Set(vigentes.map(a=>a.lote_id)).size
@@ -180,7 +181,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onChanged,onConfirmDa
               {lotes.map(x=><option key={x.id} value={x.id}>{x.codigo} · {x.cantidad_actual} animales · {x.estado==='ACTIVO'?'Activo':'Cerrado'}</option>)}
             </select>
           </div>
-          {vigente&&lote?.estado==='ACTIVO'&&onConfirmDaily&&<button type="button" onClick={()=>onConfirmDaily(vigente.id)} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Confirmar alimentación del día</button>}
+          {vigente&&lote?.estado==='ACTIVO'&&onConfirmDaily&&<button type="button" onClick={()=>onConfirmDaily(vigente.id)} disabled={confirmacionHoy} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-default disabled:bg-slate-400">{confirmacionHoy?'Alimentación de hoy confirmada':'Confirmar alimentación del día'}</button>}
         </div>
         {lote&&<>
           <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -214,7 +215,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onChanged,onConfirmDa
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             ['Días con plan',resumen.diasProgramados,'Desde las fechas de asignación'],
-            ['Días registrados',resumen.diasRegistrados,'Confirmados o registrados manualmente'],
+            ['Días registrados',resumen.diasRegistrados,String(resumen.diasConfirmadosPlan)+' desde plan; '+String(resumen.diasConRegistroManual)+' con registro manual'],
             ['Días sin registro',resumen.diasSinRegistro,'No implica que no se alimentó'],
             ['Costo registrado',clp(resumen.costoTotal),'Alimentación imputada al lote']
           ].map(([label,value,nota])=><div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">

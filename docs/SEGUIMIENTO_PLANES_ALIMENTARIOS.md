@@ -46,3 +46,13 @@ Los acumulados se calculan sobre las tablas `consumo` y `detalle_consumo`. El pa
 - Migraciones de Supabase:
   - `20261023145858_seguimiento_y_cambio_planes_lotes.sql`
   - `20261023150059_consumo_plan_unico_por_lote_dia.sql`
+
+## Eliminar, archivar y reactivar un plan maestro
+
+En **Planes disponibles**, un administrador puede:
+
+- **Eliminar** un plan que nunca haya sido asignado: se borran el plan y sus líneas de composición; se pide confirmación explícita.
+- **Archivar** un plan sin asignaciones vigentes: deja de ofrecerse para nuevas asignaciones, pero conserva su historial de lotes y consumos. Si está vigente en algún lote, primero hay que cambiarlo o desasignarlo.
+- **Reactivar** un plan archivado: vuelve a estar disponible para futuras asignaciones sin alterar las anteriores.
+
+Estas operaciones están protegidas por la RPC `sgic_gestionar_plan`, que valida permisos ADMIN y ejecuta cambios atómicos y auditados.

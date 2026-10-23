@@ -5,7 +5,8 @@ import { AnimalSearch } from '../components/AnimalSearch'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { parseClpAmount } from '../utils/clpInput'
 
-type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string }
+type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string }
+type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
 export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','consumoPlan','tratamiento','consumo']
 const titles:Record<string,string>={ingresoInsumo:'Ingresar insumos',usoInsumo:'Registrar uso',perdidaInsumo:'Registrar pérdida',configInsumo:'Uso en planes',consumoPlan:'Confirmar alimentación del día',tratamiento:'Registrar tratamiento',consumo:'Registrar alimentación real'}
@@ -15,7 +16,7 @@ const num=(s:string)=>/^\d+([.,]\d{1,3})?$/.test(s)?Number(s.replace(',','.')):N
 const cls='w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3'
 function Field({label,children}:{label:string;children:ReactNode}){const id=useId();return <div className="block min-w-0 space-y-1.5 text-sm"><label htmlFor={id} className="block font-medium">{label}</label>{Children.map(children,(child,i)=>i===0&&isValidElement(child)?cloneElement(child as ReactElement<{id?:string}>,{id}):child)}</div>}
 
-export function SupplyOperations({action,onClose,onChanged}:{action:string;onClose:()=>void;onChanged:()=>void}){
+export function SupplyOperations({action,onClose,onChanged,onCompleted}:{action:string;onClose:()=>void;onChanged:()=>void;onCompleted?:(module:'compras'|'inventario')=>void}){
  const [lists,setLists]=useState<Record<string,Row[]>>({})
  const [v,setV]=useState<Record<string,string>>({fecha:today(),tipo:'COMPRA',unidad:'kg',tipo_insumo:'LECHE',factor:'1',finalidad:action==='perdidaInsumo'?'PERDIDA':action==='tratamiento'?'TRATAMIENTO':'ALIMENTACION',destino:action==='tratamiento'?'animal':'lote'})
  const [fresh,setFresh]=useState(false),[pack,setPack]=useState(false),[eligible,setEligible]=useState(true)
@@ -23,10 +24,11 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
  const [request,setRequest]=useState(()=>crypto.randomUUID())
  const [confirm,setConfirm]=useState<ConfirmDetails|null>(null),[payload,setPayload]=useState<Record<string,unknown>|null>(null)
  const [amounts,setAmounts]=useState<Record<string,string>>({})
+ const [history,setHistory]=useState<PurchaseEntry[]>([]),[historyLoading,setHistoryLoading]=useState(false)
  const intake=action==='ingresoInsumo',plan=action==='consumoPlan',config=action==='configInsumo'
  async function load(){
   if(!supabase)return
-  const keys=['producto','unidad_medida','lote','animal','proveedor','asignacion_plan_lote','detalle_plan_consumo','plan_consumo']
+  const keys=['producto','unidad_medida','lote','animal','proveedor','asignacion_plan_lote','detalle_plan_consumo','plan_consumo','presentacion_producto']
   const results=await Promise.all(keys.map(k=>supabase!.from(k).select('*').order('id').limit(1000)))
   const bad=results.find(r=>r.error)
   if(bad?.error){setError(bad.error.message);setLoading(false);return}
@@ -37,16 +39,76 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
  const products=(lists.producto??[]).filter(p=>p.activo)
  const product=products.find(p=>String(p.id)===v.producto_id)
  const unit=(p?:Row)=>lists.unidad_medida?.find(u=>u.id===p?.unidad_base_id)?.codigo??''
+ const presentations=(lists.presentacion_producto??[]).filter(p=>p.producto_id===product?.id&&p.activa)
+ const duplicate=(lists.producto??[]).find(p=>p.nombre?.trim().toLocaleLowerCase()===v.nombre?.trim().toLocaleLowerCase())
+ useEffect(()=>{
+  if(!intake||fresh||!v.producto_id||!supabase){setHistory([]);setHistoryLoading(false);return}
+  let active=true
+  const selected=v.producto_id
+  setHistory([]);setHistoryLoading(true)
+  void (async()=>{
+   const result=await supabase!.from('ingreso_insumo').select('fecha,precio_unitario,unidad_ingreso,factor')
+    .eq('producto_id',Number(selected)).eq('tipo','COMPRA').order('id',{ascending:false}).limit(100)
+   if(!active)return
+   setHistoryLoading(false)
+   if(result.error){setError('No se pudo consultar el último precio de compra.');return}
+   const rows=(result.data??[]) as PurchaseEntry[]
+   setHistory(rows)
+   const selectedProduct=products.find(p=>String(p.id)===selected)
+   const baseUnit=unit(selectedProduct)
+   const last=rows[0]
+   const saved=(lists.presentacion_producto??[]).filter(p=>p.producto_id===selectedProduct?.id&&p.activa)
+   const lastIsPack=!!last&&(Number(last.factor)!==1||last.unidad_ingreso!==baseUnit)
+   const initialPack=lastIsPack
+    ? {nombre:last.unidad_ingreso,factor:Number(last.factor)}
+    : !last&&saved.length ? {nombre:saved[0].nombre??'',factor:Number(saved[0].cantidad_base)} : null
+   const matching=initialPack&&rows.find(h=>h.unidad_ingreso===initialPack.nombre&&Number(h.factor)===initialPack.factor)
+   setPack(!!initialPack)
+   setV(prev=>prev.producto_id===selected?{...prev,
+    presentacion:initialPack?.nombre??'',factor:String(initialPack?.factor??1),
+    precio:initialPack?(matching?String(matching.precio_unitario):''):(last?String(last.precio_unitario):'')} : prev)
+  })().catch(()=>{
+   if(active){setHistoryLoading(false);setError('No se pudo consultar el historial de compras.')}
+  })
+  return ()=>{active=false}
+ },[intake,fresh,v.producto_id,lists.presentacion_producto])
+
  const assign=lists.asignacion_plan_lote?.find(a=>String(a.id)===v.asignacion_id)
  const details=(lists.detalle_plan_consumo??[]).filter(d=>d.plan_id===assign?.plan_id)
  const qty=num(v.cantidad??''),factor=pack?num(v.factor??''):1
  const price=v.precio==='0'?0:parseClpAmount(v.precio??'')
  const base=qty*factor, total=qty*(price??NaN)
  const stockUnit=fresh?v.unidad:unit(product)
- function input(k:string,label:string,optional=false,type='text'){return <Field label={label}><input className={cls} required={!optional} type={type} max={type==='date'?today():undefined} inputMode={['cantidad','factor','precio'].includes(k)?'decimal':undefined} value={v[k]??''} onChange={e=>set(k,e.target.value)}/></Field>}
+ const previousPrice=history.find(h=>h.unidad_ingreso===(pack?v.presentacion:stockUnit)&&Number(h.factor)===(pack?Number(v.factor):1))
+ function choosePresentation(id:string){
+  const chosen=presentations.find(p=>String(p.id)===id)
+  if(!chosen){setV(prev=>({...prev,presentacion:'',factor:'1',precio:''}));return}
+  const match=history.find(h=>h.unidad_ingreso===chosen.nombre&&Number(h.factor)===Number(chosen.cantidad_base))
+  setV(prev=>({...prev,presentacion:chosen.nombre??'',factor:String(chosen.cantidad_base),precio:match?String(match.precio_unitario):''}))
+ }
+ function changePack(next:boolean){
+  setPack(next)
+  if(!next){
+   const lastBase=history.find(h=>h.unidad_ingreso===stockUnit&&Number(h.factor)===1)
+   setV(prev=>({...prev,presentacion:'',factor:'1',precio:lastBase?String(lastBase.precio_unitario):''}))
+   return
+  }
+  const first=history.find(h=>Number(h.factor)!==1||h.unidad_ingreso!==stockUnit)
+  const presentation=first?{nombre:first.unidad_ingreso,factor:Number(first.factor)}:
+   presentations[0]?{nombre:presentations[0].nombre??'',factor:Number(presentations[0].cantidad_base)}:null
+  const match=presentation&&history.find(h=>h.unidad_ingreso===presentation.nombre&&Number(h.factor)===presentation.factor)
+  setV(prev=>({...prev,presentacion:presentation?.nombre??'',factor:String(presentation?.factor??1),precio:match?String(match.precio_unitario):''}))
+ }
+ function toggleFresh(next:boolean){
+  setFresh(next);setPack(false);setHistory([])
+  setV(prev=>({...prev,producto_id:'',nombre:'',cantidad:'',precio:'',presentacion:'',factor:'1'}))
+  setEligible(next?['LECHE','CONCENTRADO'].includes(v.tipo_insumo):false)
+ }
+
+ function input(k:string,label:string,optional=false,type='text'){return <Field label={label}><input className={cls} required={!optional} type={type} max={type==='date'?today():undefined} inputMode={['cantidad','factor','precio'].includes(k)?'decimal':undefined} value={v[k]??''} onChange={e=>{const x=e.target.value;if(intake&&pack&&(k==='presentacion'||k==='factor'))setV(prev=>({...prev,[k]:x,precio:''}));else set(k,x)}}/></Field>}
  function select(k:string,label:string,options:{id:number|string;label:string}[],optional=false){return <Field label={label}><select className={cls} required={!optional} value={v[k]??''} onChange={e=>set(k,e.target.value)}><option value="">{optional?'Sin especificar':'Seleccionar'}</option>{options.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}</select></Field>}
  function chooseProduct(id:string){
-  set('producto_id',id);const p=products.find(x=>String(x.id)===id);setEligible(p?.apto_plan??false)
+  setV(prev=>({...prev,producto_id:id,precio:'',presentacion:'',factor:'1'}));setPack(false);setHistory([]);setError('');const p=products.find(x=>String(x.id)===id);setEligible(p?.apto_plan??false)
   if(action==='usoInsumo')set('finalidad',p?.tipo_insumo==='CAMA'?'CAMA':p?.tipo_insumo==='MEDICAMENTO'?'TRATAMIENTO':p?.apto_plan?'ALIMENTACION':'OTRO')
  }
  function prepare(e:FormEvent){
@@ -66,6 +128,8 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
     p={producto_id:product.id,apto_plan:eligible};description=`${product.nombre}: ${eligible?'disponible':'no disponible'} para planes de alimentación.`
    }else{
     if((!fresh||!intake)&&!product)throw Error('Escribe el nombre y selecciona una coincidencia.')
+    if(intake&&fresh&&duplicate)throw Error('Este insumo ya existe. Selecciónalo en el buscador para evitar duplicados.')
+    if(intake&&!fresh&&historyLoading)throw Error('Espera a que termine la consulta de precios anteriores.')
     if(!Number.isFinite(qty)||qty<=0)throw Error('Cantidad positiva, con hasta tres decimales, sin separadores de miles.')
     p.cantidad=qty
     if(intake){
@@ -93,7 +157,9 @@ export function SupplyOperations({action,onClose,onChanged}:{action:string;onClo
   const method=intake?'sgic_ingresar_insumo':config?'sgic_configurar_insumo':plan?'sgic_confirmar_alimentacion':'sgic_usar_insumo'
   try{
    const r=await supabase.rpc(method,{p:payload});if(r.error)throw Error(r.error.message)
-   setConfirm(null);setOk('Registro guardado. Existencias e historial actualizados.');setRequest(crypto.randomUUID());setV(prev=>({...prev,cantidad:'',precio:'',motivo:'',nombre:''}));await load();onChanged()
+   setConfirm(null);setRequest(crypto.randomUUID());onChanged()
+   if(intake&&onCompleted){onCompleted(v.tipo==='INICIAL'?'inventario':'compras');return}
+   setOk('Registro guardado. Existencias e historial actualizados.');setV(prev=>({...prev,cantidad:'',precio:'',motivo:'',nombre:''}));await load()
   }catch(e){setConfirm(null);setError(e instanceof Error?e.message:'No se pudo registrar. Puedes reintentar sin duplicar el ingreso o uso.')}
   finally{setBusy(false)}
  }

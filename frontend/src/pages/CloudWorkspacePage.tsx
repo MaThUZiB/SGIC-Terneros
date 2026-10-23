@@ -238,7 +238,7 @@ export function CloudWorkspacePage() {
             {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onChanged={()=>setRevision(x=>x+1)} onConfirmDaily={id=>{setAsignacionDiaId(id);openOperation('consumoPlan')}} />}
+            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId} onConfirmDaily={id=>{setAsignacionDiaId(id);openOperation('consumoPlan')}} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (

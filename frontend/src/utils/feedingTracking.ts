@@ -38,7 +38,7 @@ export function asignacionEnFecha(a:Asignacion,fecha:string):boolean{
 }
 export function calcularSeguimientoLote(
   loteId:number, asignaciones:Asignacion[], consumos:Consumo[],
-  detalles:DetalleConsumo[], hoy:string, fallback:ComponentePlan[]=[]
+  detalles:DetalleConsumo[], hoy:string
 ):SeguimientoLote {
   const delLote=asignaciones.filter(a=>a.lote_id===loteId)
     .sort((a,b)=>b.fecha_inicio.localeCompare(a.fecha_inicio)||b.id-a.id)
@@ -76,7 +76,7 @@ export function calcularSeguimientoLote(
     const asignacion=delLote.find(a=>asignacionEnFecha(a,fecha))
     if(!asignacion)continue
     programados++
-    const components=asignacion.componentes?.length?asignacion.componentes:fallback.filter(c=>c.id===asignacion.plan_id)
+    const components=asignacion.componentes??[]
     for(const c of components)producto(c.producto_id).planificado+=Number(c.cantidad_diaria)
     const entradas=fechas.get(fecha)??[]
     const confirmacion=entradas.some(c=>c.origen==='PLAN'&&c.observaciones==='PLAN_ASIGNACION:'+asignacion.id)

@@ -27,7 +27,7 @@ async function paginar(tabla:'consumo'|'detalle_consumo',columnas:string){
   for(let offset=0;offset<maximo;offset+=tamano){
     const result=await supabase.from(tabla).select(columnas).order('id').range(offset,offset+tamano-1)
     if(result.error)throw result.error
-    const filas=(result.data??[]) as Record<string,unknown>[]
+    const filas=(result.data??[]) as unknown as Record<string,unknown>[]
     datos.push(...filas)
     if(filas.length<tamano)return {datos,limitado:false}
   }

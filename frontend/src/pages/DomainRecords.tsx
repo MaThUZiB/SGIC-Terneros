@@ -50,10 +50,10 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
     return found?.diio??found?.nombre??found?.codigo??'#'+asText(value)
   }
   return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-      <h2 className="font-semibold text-slate-900">{config[module].title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{config[module].description}</p>
-    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+       <h2 className="text-sm font-semibold text-slate-900">{config[module].title}</h2>
+       {!loading&&!error&&<span className="text-xs text-slate-500">{rows.length} recientes</span>}
+     </div>
     {loading&&<p className="px-6 py-8 text-sm text-slate-500">Cargando registros…</p>}
     {error&&<p role="alert" className="px-6 py-5 text-sm text-red-700">{error}</p>}
     {!loading&&!error&&rows.length===0&&<p className="px-6 py-8 text-sm text-slate-500">No hay registros en este módulo.</p>}

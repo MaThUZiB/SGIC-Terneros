@@ -2,10 +2,10 @@
 
 ## Flujo de trabajo
 
-1. En **Planes**, crea el plan maestro y agrega los alimentos con una cantidad diaria expresada en la unidad base. Esta cantidad corresponde **al lote completo**, no a cada animal.
-2. En **Planes → Seguimiento del lote**, selecciona un lote activo y asigna un plan. La asignación no altera el inventario.
-3. Cada día, usa **Confirmar alimentación del día**. Puedes modificar la cantidad entregada de cada alimento; registra cero para omitir alguno. Al confirmar, el sistema descuenta las existencias e imputa el costo promedio al lote.
-4. En el seguimiento consulta el consumo total y durante la vigencia del plan, los días registrados o sin registro, el costo acumulado y los movimientos recientes.
+1. En **Alimentación → Gestión de planes**, consulta el catálogo de planes activos y archivados, su composición diaria, número de lotes asignados e historial. Crea planes con **Crear nuevo registro** y agrega sus ingredientes con **Agregar producto a plan**. La cantidad del plan maestro corresponde **al lote completo**.
+2. Desde **Gestión de planes**, abre un plan y elige **Asignar** para vincularlo con un lote activo; también puedes cambiar o desasignar el plan desde **Seguimiento por lote**. La asignación no altera el inventario.
+3. Cada día, usa **Confirmar alimentación del día**. Por defecto, el formulario recibe la cantidad total diaria congelada para el lote. Opcionalmente selecciona **Por ternero** e ingresa la ración individual de cada insumo; el sistema multiplica por los animales actualmente registrados, redondea la cantidad total a tres decimales y permite editarla antes de confirmar. Registra cero para omitir un insumo. El formulario muestra costo estimado y alerta si el stock no alcanza. Solo al confirmar se descuentan existencias y se imputa el costo real.
+4. En **Seguimiento por lote** consulta el consumo total y durante la vigencia del plan, los días registrados o sin registro, el costo acumulado y los movimientos recientes.
 5. Si cambias la dieta, selecciona otro plan y pulsa **Cambiar plan**; si suspendes la planificación, pulsa **Desasignar**. Ambas acciones conservan asignaciones y consumos anteriores.
 
 También puedes abrir la ficha desde **Lotes → Seguimiento alimentario**.
@@ -56,3 +56,15 @@ En **Planes disponibles**, un administrador puede:
 - **Reactivar** un plan archivado: vuelve a estar disponible para futuras asignaciones sin alterar las anteriores.
 
 Estas operaciones están protegidas por la RPC `sgic_gestionar_plan`, que valida permisos ADMIN y ejecuta cambios atómicos y auditados.
+
+## Cálculo diario y límites del modelo vigente
+
+- **Total del lote** (por defecto): `cantidad_a_descontar = cantidad_diaria_configurada`. No hay multiplicación automática; esto mantiene los planes anteriores sin cambios de significado.
+- **Por ternero** (opción de registro diario): `cantidad_a_descontar = redondear_3(cantidad_por_ternero × animales_activos_actuales)`. Esta opción usa el censo actual, solo permite confirmar hoy y no modifica el plan maestro ni la instantánea de su asignación. La sugerencia inicial deriva de la cantidad total del plan / censo actual, por lo que editarla es necesario si cambia la ración individual.
+- La previsualización muestra cantidades por alimento, equivalencia aproximada por cabeza, stock insuficiente y costo calculado al costo promedio actual. Los datos pueden cambiar antes de confirmar, por lo que Supabase vuelve a validar existencias y fecha en la operación transaccional.
+- Las cantidades son **unidades base del inventario** (kg, l, etc.), no número de sacos ni volumen de leche reconstituida si el producto almacenado es sustituto en polvo.
+- No se registran automáticamente días sin confirmación. El registro manual y la confirmación del plan son movimientos separados: no vuelvas a registrar manualmente la misma entrega que ya confirmaste desde el plan.
+
+### Evolución recomendada del cálculo
+
+El próximo paso para un modelo duradero es permitir **planes maestros con tipo de dosis persistente** (`por animal` o `por lote`), congelar esa elección en cada asignación y guardar el censo utilizado en cada ejecución. Así, una reducción del lote mantendría la ración individual sin cambiar manualmente el plan maestro. Para sustitutos lácteos sería útil configurar una **equivalencia por producto** entre litros preparados y kg de polvo consumido, evitando contabilizar dos veces el mismo alimento. Requiere migración versionada y revisión de reportes históricos; estos cambios no se activan automáticamente con la interfaz actual.

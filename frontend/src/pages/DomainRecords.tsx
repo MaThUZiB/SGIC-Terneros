@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../api/supabase'
+import { Pagination } from '../components/Pagination'
+import { PAGE_SIZE,pageRange } from '../utils/pagination'
 
 type RecordModule='ventas'|'gastos'|'sanidad'
 type Item=Record<string,unknown>
@@ -17,32 +19,45 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
   const [names,setNames]=useState<{animales:Named[];productos:Named[];lotes:Named[]}>({animales:[],productos:[],lotes:[]})
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [page,setPage]=useState(0)
+  const [total,setTotal]=useState(0)
+  useEffect(()=>setPage(0),[module])
   useEffect(()=>{
     let active=true
     async function load(){
       if(!supabase)return
-      setLoading(true)
-      const [main,animal,product,lote]=await Promise.all([
-        supabase.from(config[module].table).select('*').order('fecha',{ascending:false}).limit(200),
-        supabase.from('animal').select('id,diio').limit(1000),
-        supabase.from('producto').select('id,nombre').limit(500),
-        supabase.from('lote').select('id,codigo').limit(500),
-      ])
-      if(!active)return
-      const failure=[main.error,animal.error,product.error,lote.error].find(Boolean)
-      if(failure){setError('No se pudieron cargar los registros: '+failure.message)}
-      else{
-        setError('')
-        setRows((main.data??[]) as Item[])
-        setNames({
-          animales:(animal.data??[]) as Named[],productos:(product.data??[]) as Named[],lotes:(lote.data??[]) as Named[],
-        })
-      }
-      setLoading(false)
+      setLoading(true);setError('')
+      try{
+        const {from,to}=pageRange(page)
+        const main=await supabase.from(config[module].table)
+          .select('*',{count:'exact'}).order('fecha',{ascending:false}).order('id',{ascending:false}).range(from,to)
+        if(main.error)throw new Error(main.error.message)
+        if(!active)return
+        const count=main.count??0
+        if(from>=count&&page>0){setPage(Math.max(0,Math.ceil(count/PAGE_SIZE)-1));return}
+        const records=(main.data??[]) as Item[]
+        const ids=(key:string)=>[...new Set(records.map(item=>Number(item[key])).filter(x=>Number.isSafeInteger(x)&&x>0))]
+        const getNames=async(table:string,columns:string,values:number[]):Promise<Named[]>=>{
+          if(!values.length)return []
+          const result=await supabase!.from(table).select(columns).in('id',values)
+          if(result.error)throw new Error(result.error.message)
+          return (result.data??[]) as Named[]
+        }
+        const [animals,products,lotes]=await Promise.all([
+          getNames('animal','id,diio',ids('animal_id')),
+          getNames('producto','id,nombre',ids('producto_id')),
+          getNames('lote','id,codigo',ids('lote_id')),
+        ])
+        if(!active)return
+        setRows(records);setTotal(count)
+        setNames({animales:animals,productos:products,lotes})
+      }catch(e){
+        if(active){setError('No se pudieron consultar los registros: '+(e instanceof Error?e.message:'error de consulta'));setRows([])}
+      }finally{if(active)setLoading(false)}
     }
     void load()
     return()=>{active=false}
-  },[module,revision])
+  },[module,revision,page])
 
   const label=(source:'animales'|'productos'|'lotes',value:unknown)=>{
     const id=Number(value)
@@ -52,7 +67,7 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
   return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
        <h2 className="text-sm font-semibold text-slate-900">{config[module].title}</h2>
-       {!loading&&!error&&<span className="text-xs text-slate-500">{rows.length} recientes</span>}
+       {!loading&&!error&&<span className="text-xs text-slate-500">{total} registrados</span>}
      </div>
     {loading&&<p className="px-6 py-8 text-sm text-slate-500">Cargando registros…</p>}
     {error&&<p role="alert" className="px-6 py-5 text-sm text-red-700">{error}</p>}
@@ -76,5 +91,6 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
         </>}
       </div>)}
     </div>}
+    {!loading&&!error&&<Pagination page={page} total={total} onChange={setPage} label={config[module].title}/>}
   </section>
 }

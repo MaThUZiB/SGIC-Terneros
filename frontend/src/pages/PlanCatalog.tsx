@@ -124,7 +124,7 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
               <button type="button" disabled={busy} onClick={()=>onManage(actual,'REACTIVAR')} className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-800">Reactivar</button>}
             {asignacionesPlan.length===0&&<button type="button" disabled={busy} onClick={()=>onManage(actual,'ELIMINAR')} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-medium text-rose-800">Eliminar</button>}
           </div>
-        </details>
+        </details>}
       </>}
     </div>
   </section>

@@ -79,3 +79,10 @@ input[type="checkbox"], input[type="radio"] { min-height: 22px; width: 22px; hei
   .sgic-bottom-nav button { -webkit-tap-highlight-color: transparent; }
   .sgic-more-panel { max-height: min(65dvh, 520px); }
 }
+
+/* Mantener las cuatro etiquetas visibles incluso con zoom ampliado. */
+.sgic-bottom-nav button { min-width: 0; }
+.sgic-bottom-nav button > span:last-child {
+  display: block; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}

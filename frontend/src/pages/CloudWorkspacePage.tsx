@@ -64,6 +64,8 @@ export function CloudWorkspacePage() {
   const {tab,operation,catalogType,animalCard,buscar,filtroAnimal,abrirModulo,setBuscar,setFiltroAnimal,
     openOperation,closeOperation,openAnimal,closeAnimal,setAnimalAction}=useWorkspaceNavigation()
   const [menuOpen,setMenuOpen] = useState(false)
+  // También cerrar «Más» al navegar con Atrás/Adelante del navegador.
+  useEffect(()=>setMenuOpen(false),[tab])
   const [datos, setDatos] = useState<Datos | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')

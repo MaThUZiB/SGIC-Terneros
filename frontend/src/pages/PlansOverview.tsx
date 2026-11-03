@@ -35,8 +35,9 @@ async function paginar(tabla:'consumo'|'detalle_consumo',columnas:string){
   return {datos,limitado:true}
 }
 
-export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
-  esAdmin?:boolean;initialLoteId?:number|null;onSelectLote?:(loteId:number)=>void
+export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onCreatePlan,onAddFood,onViewTracking}:{
+  esAdmin?:boolean;initialLoteId?:number|null;onSelectLote?:(loteId:number)=>void;
+  onCreatePlan?:()=>void;onAddFood?:()=>void;onViewTracking?:()=>void
 }){
   const [planes,setPlanes]=useState<Plan[]>([])
   const [detalles,setDetalles]=useState<Detail[]>([])
@@ -221,7 +222,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
       <nav aria-label="Vistas de alimentación" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
         <button type="button" aria-pressed={vista==='planes'} onClick={()=>setVista('planes')}
           className={'rounded-xl px-4 py-2.5 text-sm font-semibold '+(vista==='planes'?'bg-emerald-900 text-white':'border border-slate-200 bg-white text-slate-700')}>Gestión de planes</button>
-        <button type="button" aria-pressed={vista==='lotes'} onClick={()=>setVista('lotes')}
+        <button type="button" aria-pressed={vista==='lotes'} onClick={()=>{onViewTracking?.();setVista('lotes')}}
           className={'rounded-xl px-4 py-2.5 text-sm font-semibold '+(vista==='lotes'?'bg-emerald-900 text-white':'border border-slate-200 bg-white text-slate-700')}>Seguimiento por lote</button>
       </nav>
       {vista==='lotes'&&<>
@@ -338,9 +339,11 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
         productos={productos} unidades={unidades} esAdmin={esAdmin} busy={busy}
         onAssign={(loteId,planId)=>solicitarCambio(loteId,planId)}
         onUnassign={solicitarDesasignar}
+        onCreatePlan={()=>onCreatePlan?.()}
+        onAddFood={()=>onAddFood?.()}
         onManage={solicitarGestionPlan}
         onModeChange={async(planId,modo)=>{if(!supabase)return;setBusy(true);setError('');try{const result=await supabase.rpc('sgic_configurar_modo_plan',{p_plan_id:planId,p_modo:modo});if(result.error)throw result.error;setAviso('Modalidad de cálculo actualizada.');await cargar()}catch(e){setError(e instanceof Error?e.message:'No se pudo modificar el plan')}finally{setBusy(false)}}}
-        onOpenLote={loteId=>{setSeleccion(String(loteId));onSelectLote?.(loteId);setVista('lotes')}}/>}
+        onOpenLote={loteId=>{setSeleccion(String(loteId));onSelectLote?.(loteId);onViewTracking?.();setVista('lotes')}}/>}
     </>}
     <OperationConfirmDialog details={confirmacion?.details??null} onCancel={()=>setConfirmacion(null)} onConfirm={()=>void ejecutar()} busy={busy}/>
   </section>

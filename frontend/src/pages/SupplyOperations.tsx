@@ -4,8 +4,9 @@ import { supabase } from '../api/supabase'
 import { AnimalSearch } from '../components/AnimalSearch'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { parseClpAmount } from '../utils/clpInput'
+import { calcularRacionDiaria, sugerenciaPorAnimal, type ModoRacion } from '../utils/dailyRation'
 
-type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
+type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_actual?:number; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
 type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
 export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','consumoPlan','tratamiento','consumo']
@@ -24,6 +25,7 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
  const [request,setRequest]=useState(()=>crypto.randomUUID())
  const [confirm,setConfirm]=useState<ConfirmDetails|null>(null),[payload,setPayload]=useState<Record<string,unknown>|null>(null)
  const [amounts,setAmounts]=useState<Record<string,string>>({})
+ const [modoRacion,setModoRacion]=useState<ModoRacion>('LOTE')
  const [history,setHistory]=useState<PurchaseEntry[]>([]),[historyLoading,setHistoryLoading]=useState(false)
  const intake=action==='ingresoInsumo',plan=action==='consumoPlan',config=action==='configInsumo'
  async function load(){
@@ -75,6 +77,9 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
 
  const assign=lists.asignacion_plan_lote?.find(a=>String(a.id)===v.asignacion_id)
  const details=assign?.componentes??(lists.detalle_plan_consumo??[]).filter(d=>d.plan_id===assign?.plan_id)
+ const cabezas=Number((lists.lote??[]).find(l=>l.id===assign?.lote_id)?.cantidad_actual??0)
+ const racion=calcularRacionDiaria(details,amounts,modoRacion,cabezas,Object.fromEntries(products.map(p=>[p.id,Number(p.stock_actual??0)])))
+ const costoEstimado=racion.lineas.reduce((sum,line)=>sum+line.cantidad*Number(products.find(p=>p.id===line.producto_id)?.costo_promedio??0),0)
  const qty=num(v.cantidad??''),factor=pack?num(v.factor??''):1
  const price=v.precio==='0'?0:parseClpAmount(v.precio??'')
  const base=qty*factor, total=qty*(price??NaN)
@@ -119,10 +124,12 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
    let summary:ConfirmDetails['summary']
    if(plan){
     if(!assign||!details.length)throw Error('Selecciona una asignación con alimentos.')
-    const rows=details.map(d=>({detalle_id:d.id,cantidad:num(amounts[d.id]??String(d.cantidad_diaria))}))
-    if(rows.some(x=>!Number.isFinite(x.cantidad)||x.cantidad<0)||!rows.some(x=>x.cantidad>0))throw Error('Revisa las cantidades. Puedes usar cero para omitir un alimento.')
-    p={asignacion_id:assign.id,fecha:v.fecha,detalles:rows}
-    description=rows.map(d=>{const line=details.find(x=>x.id===d.detalle_id)!;const prod=products.find(x=>x.id===line.producto_id);return `${prod?.nombre}: ${d.cantidad} ${unit(prod)}`}).join('\n')+'\nSe descontarán estas cantidades una sola vez para esta asignación y fecha.'
+    if(racion.errores.length)throw Error(racion.errores.join(' '))
+     if(racion.stockInsuficiente.length)throw Error('Inventario insuficiente para: '+racion.stockInsuficiente.map(x=>products.find(p=>p.id===x.productoId)?.nombre+' ('+x.requerido+' / '+x.disponible+')').join('; '))
+     if(modoRacion==='ANIMAL'&&v.fecha!==today())throw Error('El cálculo por ternero solo está disponible para la fecha de hoy.')
+     const rows=racion.lineas.map(({detalle_id,cantidad})=>({detalle_id,cantidad}))
+     p={asignacion_id:assign.id,fecha:v.fecha,detalles:rows}
+    description=rows.map(d=>{const line=details.find(x=>x.id===d.detalle_id)!;const prod=products.find(x=>x.id===line.producto_id);return `${prod?.nombre}: ${d.cantidad} ${unit(prod)}`}).join('\n')+'\nEstos totales se descontarán una sola vez por lote y fecha. Costo estimado: '+money(costoEstimado)+'.'
    }else if(config){
     if(!product)throw Error('Selecciona un insumo.')
     p={producto_id:product.id,apto_plan:eligible};description=`${product.nombre}: ${eligible?'disponible':'no disponible'} para planes de alimentación.`

@@ -77,8 +77,9 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
 
  const assign=lists.asignacion_plan_lote?.find(a=>String(a.id)===v.asignacion_id)
  const details=assign?.componentes??(lists.detalle_plan_consumo??[]).filter(d=>d.plan_id===assign?.plan_id)
+ const lineasRacion=details.map(d=>({id:d.id,producto_id:Number(d.producto_id),cantidad_diaria:Number(d.cantidad_diaria)}))
  const cabezas=Number((lists.lote??[]).find(l=>l.id===assign?.lote_id)?.cantidad_actual??0)
- const racion=calcularRacionDiaria(details,amounts,modoRacion,cabezas,Object.fromEntries(products.map(p=>[p.id,Number(p.stock_actual??0)])))
+ const racion=calcularRacionDiaria(lineasRacion,amounts,modoRacion,cabezas,Object.fromEntries(lineasRacion.map(d=>[d.producto_id,Number(products.find(p=>p.id===d.producto_id)?.stock_actual??0)])))
  const costoEstimado=racion.lineas.reduce((sum,line)=>sum+line.cantidad*Number(products.find(p=>p.id===line.producto_id)?.costo_promedio??0),0)
  const qty=num(v.cantidad??''),factor=pack?num(v.factor??''):1
  const price=v.precio==='0'?0:parseClpAmount(v.precio??'')
@@ -194,7 +195,7 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
      <p className="mt-1 text-xs text-slate-600">La receta original se define para todo el lote. Opcionalmente puedes ingresar la ración individual y calcular el total para los animales actuales, sin modificar el plan maestro.</p>
      <div className="mt-3 grid grid-cols-2 gap-2">
        <button type="button" aria-pressed={modoRacion==='LOTE'} onClick={()=>{setModoRacion('LOTE');setAmounts({})}} className={'rounded-lg px-3 py-2 text-xs font-semibold '+(modoRacion==='LOTE'?'bg-emerald-900 text-white':'border border-slate-300 bg-white')}>Total del lote</button>
-       <button type="button" aria-pressed={modoRacion==='ANIMAL'} disabled={cabezas<=0} onClick={()=>{setModoRacion('ANIMAL');setAmounts(sugerenciaPorAnimal(details,cabezas))}} className={'rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 '+(modoRacion==='ANIMAL'?'bg-emerald-900 text-white':'border border-slate-300 bg-white')}>Por ternero</button>
+       <button type="button" aria-pressed={modoRacion==='ANIMAL'} disabled={cabezas<=0} onClick={()=>{setModoRacion('ANIMAL');setAmounts(sugerenciaPorAnimal(lineasRacion,cabezas))}} className={'rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 '+(modoRacion==='ANIMAL'?'bg-emerald-900 text-white':'border border-slate-300 bg-white')}>Por ternero</button>
      </div>
    </div>}
    {plan&&<><Field label="Plan y lote"><select className={cls} required value={v.asignacion_id??''} onChange={e=>{set('asignacion_id',e.target.value);setAmounts({});setModoRacion('LOTE')}}><option value="">Seleccionar asignación</option>{(lists.asignacion_plan_lote??[]).filter(a=>a.activo).map(a=><option key={a.id} value={a.id}>{lists.plan_consumo?.find(p=>p.id===a.plan_id)?.nombre} · {lists.lote?.find(l=>l.id===a.lote_id)?.codigo}</option>)}</select></Field>{details.map(d=>{const p=products.find(p=>p.id===d.producto_id);return <Field key={d.id} label={`${p?.nombre??'Insumo inactivo'} · ${unit(p)} ${modoRacion==='ANIMAL'?'por ternero':'totales para el lote'}`}><input className={cls} required inputMode="decimal" value={amounts[d.id]??String(d.cantidad_diaria)} onChange={e=>setAmounts(prev=>({...prev,[d.id]:e.target.value}))}/><span className="block text-xs text-slate-500">Plan base: {d.cantidad_diaria} {unit(p)}/lote · Disponible: {p?.stock_actual??0} {unit(p)}. Cero omite este alimento. {modoRacion==='ANIMAL'?'Total calculado: '+(racion.lineas.find(l=>l.detalle_id===d.id)?.cantidad??0)+' '+unit(p)+'.':'Equivale a '+(racion.lineas.find(l=>l.detalle_id===d.id)?.porAnimal??0)+' '+unit(p)+' por ternero (referencial).'}</span></Field>})}</>}

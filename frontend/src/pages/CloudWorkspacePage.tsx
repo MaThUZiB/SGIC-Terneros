@@ -19,18 +19,15 @@ import { SaleIndividualPrices } from './SaleIndividualPrices'
 import { AnimalCard, type AnimalRecord } from './AnimalCard'
 import { MatusFooter } from '../components/MatusFooter'
 import { PaginatedRegistry } from './PaginatedRegistry'
+import { PurchasesRegistry } from './PurchasesRegistry'
 
 type Animal = AnimalRecord
 type Lote = { id: number; codigo: string; cantidad_actual: number; estado: string }
 type Producto = { id: number; nombre: string; stock_actual: number; stock_minimo: number; costo_promedio: number; tipo_insumo:string; unidad_medida:{codigo:string}|null }
 type Proveedor = { id: number; nombre: string }
-type CompraAnimal = { id: number; fecha: string; total: number; proveedor_id: number|null }
-type CompraInsumo = { id: number; proveedor_id: number; fecha: string; total: number; estado: string; numero_documento: string | null }
-type DetalleCompraAnimal = { compra_id:number; animal_id:number }
-type DetalleCompraInsumo = { compra_id:number; producto_id:number; cantidad:number; cantidad_base:number; subtotal:number }
 type Datos = {
   animales: Animal[]; razas: {id:number;nombre:string}[]; lotes: Lote[]; productos: Producto[]; presentaciones: PresentacionStock[]
-  proveedores: Proveedor[]; comprasAnimal: CompraAnimal[]; comprasInsumo: CompraInsumo[]; detalleAnimales: DetalleCompraAnimal[]; detalleInsumos: DetalleCompraInsumo[]
+  proveedores: Proveedor[]
 }
 const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
@@ -77,11 +74,13 @@ export function CloudWorkspacePage() {
   useEffect(() => {
     let vigente = true
 
-    async function cargarTodos<T>(tabla:string,columnas:string):Promise<T[]>{
+    async function cargarTodos<T>(tabla:string,columnas:string,soloActivas=false):Promise<T[]>{
       const all:T[]=[]
       const size=1000
       for(let inicio=0;inicio<200000;inicio+=size){
-        const result=await supabase!.from(tabla).select(columnas).order('id',{ascending:true}).range(inicio,inicio+size-1)
+        let query=supabase!.from(tabla).select(columnas).order('id',{ascending:true}).range(inicio,inicio+size-1)
+        if(soloActivas)query=query.eq('activa',true)
+        const result=await query
         if(result.error)throw new Error(result.error.message)
         const items=(result.data??[]) as unknown as T[]
         all.push(...items)
@@ -100,32 +99,22 @@ export function CloudWorkspacePage() {
       setCargando(true)
       setError('')
       try {
-        const [a, l, p, pr, ca, ci, da, di, ra, pp] = await Promise.all([
+        const [a,l,p,pr,ra,pp] = await Promise.all([
           cargarTodos<Animal>('animal','id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones'),
-          supabase.from('lote').select('id,codigo,cantidad_actual,estado').order('codigo').limit(500),
+          cargarTodos<Lote>('lote','id,codigo,cantidad_actual,estado'),
           cargarTodos<Producto>('producto','id,nombre,stock_actual,stock_minimo,costo_promedio,tipo_insumo,unidad_medida(codigo)'),
-          supabase.from('proveedor').select('id,nombre').order('nombre').limit(200),
-          supabase.from('compra_animal').select('id,fecha,total,proveedor_id').order('fecha', { ascending: false }).limit(300),
-          supabase.from('compra_insumo').select('id,fecha,total,estado,numero_documento,proveedor_id').order('fecha', { ascending: false }).limit(300),
-          supabase.from('detalle_compra_animal').select('compra_id,animal_id').limit(1000),
-          supabase.from('detalle_compra_insumo').select('compra_id,producto_id,cantidad,cantidad_base,subtotal').limit(1000),
-          supabase.from('raza').select('id,nombre').order('nombre').limit(1000),
-          supabase.from('presentacion_producto').select('id,producto_id,nombre,cantidad_base,activa').eq('activa',true).order('id',{ascending:false}).limit(1000),
+          cargarTodos<Proveedor>('proveedor','id,nombre'),
+          cargarTodos<{id:number;nombre:string}>('raza','id,nombre'),
+          cargarTodos<PresentacionStock>('presentacion_producto','id,producto_id,nombre,cantidad_base,activa',true),
         ])
-        const fallo = [l.error, pr.error, ca.error, ci.error, da.error, di.error, ra.error, pp.error].find(Boolean)
-        if (fallo) throw new Error(fallo.message)
         if (vigente) {
           setDatos({
             animales:a,
-            razas: ra.data??[],
-            lotes: (l.data ?? []) as Lote[],
+            razas:ra,
+            lotes:l.sort((a,b)=>a.codigo.localeCompare(b.codigo,'es')),
             productos:p,
-            presentaciones: (pp.data ?? []) as PresentacionStock[],
-            proveedores: (pr.data ?? []) as Proveedor[],
-            comprasAnimal: (ca.data ?? []) as CompraAnimal[],
-            comprasInsumo: (ci.data ?? []) as CompraInsumo[],
-            detalleAnimales:(da.data??[]) as DetalleCompraAnimal[],
-            detalleInsumos:(di.data??[]) as DetalleCompraInsumo[],
+            presentaciones:pp,
+            proveedores:pr,
           })
         }
       } catch {
@@ -293,42 +282,9 @@ export function CloudWorkspacePage() {
               type={tab} search={buscar} filter={filtroAnimal} onFilter={setFiltroAnimal}
               onOpenAnimal={openAnimal} revision={revision} presentaciones={datos.presentaciones}/>}
             
-            {tab === 'compras' && (
-              <div className="grid gap-5 lg:grid-cols-2">
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="font-semibold">Compras de animales</h2>
-                  <div className="mt-4 space-y-3">
-                    {datos.comprasAnimal.map(c => {
-                      const list=datos.detalleAnimales.filter(d=>d.compra_id===c.id)
-                        .map(d=>datos.animales.find(a=>a.id===d.animal_id)?.diio??'DIIO #'+d.animal_id)
-                      const proveedor=datos.proveedores.find(p=>p.id===c.proveedor_id)?.nombre??'Proveedor sin especificar'
-                      return <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
-                        <div className="flex items-start justify-between gap-4"><div><div className="font-semibold">Compra de animales #{c.id}</div><div className="mt-1 text-xs text-slate-500">{c.fecha} · {proveedor}</div></div><strong>{formatoDinero(c.total)}</strong></div>
-                        <p className="mt-2 text-xs text-slate-600">{list.length} animales · {list.slice(0,5).join(', ')}{list.length>5?' y otros '+(list.length-5):''}</p>
-                      </div>
-                    })}
-                    {datos.comprasAnimal.length === 0 && <TablaVacia texto="Sin compras registradas." />}
-                  </div>
-                </section>
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="font-semibold">Compras de insumos</h2>
-                  <div className="mt-4 space-y-3">
-                    {datos.comprasInsumo.map(c => {
-                      const lines=datos.detalleInsumos.filter(d=>d.compra_id===c.id)
-                      const provider=datos.proveedores.find(p=>p.id===c.proveedor_id)?.nombre??'Proveedor sin especificar'
-                      return <div key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
-                        <div className="flex items-start justify-between gap-4"><div><div className="font-semibold">Compra de insumos #{c.id} · {provider}</div><div className="mt-1 text-xs text-slate-500">{c.fecha} · <span className={c.estado==='BORRADOR'?'font-semibold text-amber-800':'text-emerald-700'}>{c.estado==='BORRADOR'?'PENDIENTE':c.estado}</span> {c.numero_documento?'· '+c.numero_documento:''}</div></div><strong>{formatoDinero(c.total)}</strong></div>
-                        <div className="mt-3 space-y-1">{lines.map(d=><p key={d.producto_id+'-'+d.subtotal} className="text-xs text-slate-600">
-                          {datos.productos.find(p=>p.id===d.producto_id)?.nombre??'Producto #'+d.producto_id} · {formatoCantidad(d.cantidad)} presentaciones / {formatoCantidad(d.cantidad_base)} unidades base · {formatoDinero(d.subtotal)}
-                        </p>)}</div>
-                        {c.estado==='BORRADOR'&&<button type="button" onClick={()=>abrirModulo('pendientes')} className="mt-3 text-xs font-semibold text-amber-800 hover:underline">Revisar solicitud →</button>}
-                      </div>
-                    })}
-                    {datos.comprasInsumo.length === 0 && <TablaVacia texto="Sin compras registradas." />}
-                  </div>
-                </section>
-              </div>
-            )}
+            {tab==='compras'&&<PurchasesRegistry revision={revision}
+              providers={datos.proveedores} products={datos.productos} animals={datos.animales}
+              onPending={()=>abrirModulo('pendientes')}/>}
           </>
         )}
 

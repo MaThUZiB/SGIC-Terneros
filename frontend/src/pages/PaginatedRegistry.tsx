@@ -48,6 +48,7 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
 
   useEffect(()=>{
     if(!supabase)return
+    const db=supabase
     let active=true
     async function loadCounts(){
       if(type!=='animales'||!supabase)return

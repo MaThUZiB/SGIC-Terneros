@@ -2,34 +2,34 @@ import { TableScroll } from '../components/TableScroll'
 import { useEffect, useState } from 'react'
 import { supabase } from '../api/supabase'
 
-type Row = {
-  lote_id:number; codigo:string; estado:string; cantidad_actual:number;
-  adquisicion:number; alimentacion:number; sanidad:number; gastos_imputables:number;
-  ingresos_venta:number; costo_reconocido:number; utilidad_ventas:number
+type Row={
+ lote_id:number; codigo:string; estado:string; cantidad_actual:number;
+ adquisicion:number; alimentacion:number; sanidad:number; gastos_imputables:number;
+ ingresos_venta:number; costo_reconocido:number; utilidad_ventas:number
 }
-const format = (v:number) => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(v)
-const sum = (r:Row[],key:keyof Row) => r.reduce((acc,x)=>acc+Number(x[key]||0),0)
+const format=(v:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(v)
+const sum=(rows:Row[],key:keyof Row)=>rows.reduce((acc,x)=>acc+Number(x[key]||0),0)
 function Stat({title,value,help}:{title:string;value:string;help:string}){
- return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</p>
-  <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{value}</p>
-  <p className="mt-1 text-xs leading-5 text-slate-500">{help}</p>
+ return <section aria-label={title+': '+value+'. '+help} className="rounded-xl border border-slate-200 bg-white p-4">
+   <p className="text-xs font-medium text-slate-500">{title}</p>
+   <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight">{value}</p>
  </section>
 }
 export function ProfitabilityReport({bajasPorLote={}}:{bajasPorLote?:Record<number,number>}){
  const [rows,setRows]=useState<Row[]>([])
  const [loading,setLoading]=useState(true)
  const [error,setError]=useState('')
+ const [desglose,setDesglose]=useState(false)
  useEffect(()=>{
   let mounted=true
   async function run(){
-    if(!supabase)return
-    const result=await supabase.from('sgic_rentabilidad_lote').select('*').order('codigo').limit(500)
-    if(mounted){
-      if(result.error)setError('No fue posible calcular el reporte de rentabilidad.')
-      else setRows((result.data||[]) as Row[])
-      setLoading(false)
-    }
+   if(!supabase){if(mounted){setError('Sin conexión a Supabase');setLoading(false)}return}
+   const result=await supabase.from('sgic_rentabilidad_lote').select('*').order('codigo').limit(500)
+   if(mounted){
+    if(result.error)setError('No fue posible calcular el reporte de rentabilidad.')
+    else setRows((result.data||[]) as Row[])
+    setLoading(false)
+   }
   }
   void run()
   return ()=>{mounted=false}
@@ -38,47 +38,64 @@ export function ProfitabilityReport({bajasPorLote={}}:{bajasPorLote?:Record<numb
  const ingresos=sum(rows,'ingresos_venta')
  const costo=sum(rows,'costo_reconocido')
  const margen=ingresos>0?((ingresos-costo)/ingresos*100).toFixed(1):'0.0'
- return <div className="space-y-5">
-  <div className="rounded-2xl border border-slate-200 bg-white p-6">
-   <h2 className="text-lg font-semibold">Costos y rentabilidad por lote</h2>
-   <p className="mt-2 text-sm leading-6 text-slate-600">
-    Costos históricos de adquisición, alimentación, sanidad y gastos imputables.
-    La utilidad solo refleja ventas confirmadas y su costo reconocido; los gastos generales
-    no asignados no se distribuyen entre lotes.
-   </p>
-  </div>
+ return <div className="space-y-4">
+  <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+   <h2 className="text-lg font-semibold">Rentabilidad</h2>
+   <details className="text-xs text-slate-600"><summary className="cursor-pointer">Cómo se calcula</summary>
+    <p className="mt-2 max-w-xl leading-5">La utilidad considera ventas confirmadas y costos reconocidos. Los gastos generales sin asignación no se distribuyen entre lotes; las bajas se presentan por separado.</p>
+   </details>
+  </header>
   {error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
-  {loading&&<p className="text-sm text-slate-500">Calculando cifras...</p>}
+  {loading&&<p className="text-sm text-slate-500">Calculando cifras…</p>}
   {!loading&&!error&&<>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <Stat title="Ingreso confirmado" value={format(ingresos)} help="Ventas con estado confirmado" />
-      <Stat title="Costo reconocido" value={format(costo)} help="Adquisición y costos ya imputados a ventas" />
-      <Stat title="Utilidad realizada" value={format(ingresos-costo)} help="Antes de gastos generales sin asignación" />
-      <Stat title="Bajas por fallecimiento" value={format(bajas)} help="Solo adquisición. Ya incluida en el costo histórico; no se vuelve a sumar como gasto." />
-      <Stat title="Ventas menos bajas de adquisición" value={format(ingresos-costo-bajas)} help="Resultado de ventas descontando la adquisición de fallecidos. No calcula costos de crianza individuales." />
-      <Stat title="Margen realizado" value={margen+' %'} help="Utilidad / ingreso de ventas confirmadas" />
+   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <Stat title="Ingresos" value={format(ingresos)} help="Ventas confirmadas"/>
+    <Stat title="Costo reconocido" value={format(costo)} help="Costo reconocido de ventas"/>
+    <Stat title="Utilidad realizada" value={format(ingresos-costo)} help="Antes de gastos generales sin asignación"/>
+    <Stat title="Margen" value={margen+' %'} help="Utilidad sobre ingresos confirmados"/>
+   </div>
+   <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+    <summary className="cursor-pointer text-sm font-medium">Otros indicadores</summary>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+     <Stat title="Bajas por fallecimiento" value={format(bajas)} help="Adquisición de animales fallecidos, ya incluida en costos históricos"/>
+     <Stat title="Ventas menos bajas" value={format(ingresos-costo-bajas)} help="Indicador complementario; no equivale a utilidad completa por crianza"/>
     </div>
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 p-5"><h3 className="font-semibold">Desglose de costos</h3></div>
-      {!rows.length?<p className="p-5 text-sm text-slate-500">No existen lotes registrados.</p>:
-      <TableScroll><table className="min-w-full text-left text-sm">
-        <thead><tr>{['Lote','Activos','Adquisición histórica','Bajas incluidas en adquisición','Alimentación','Sanidad','Gastos','Costo total','Ventas','Costo reconocido','Utilidad'].map(t=>
-          <th className="whitespace-nowrap p-3 text-xs uppercase tracking-wide text-slate-500" key={t}>{t}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-100">{rows.map(r=><tr key={r.lote_id} className="hover:bg-slate-50">
-          <td className="p-3 font-semibold">{r.codigo}</td><td className="p-3">{r.cantidad_actual}</td>
-          <td className="whitespace-nowrap p-3">{format(r.adquisicion)}</td>
-          <td className="whitespace-nowrap p-3 text-rose-800">{format(bajasPorLote[r.lote_id]??0)}</td>
-          <td className="whitespace-nowrap p-3">{format(r.alimentacion)}</td>
-          <td className="whitespace-nowrap p-3">{format(r.sanidad)}</td>
-          <td className="whitespace-nowrap p-3">{format(r.gastos_imputables)}</td>
-          <td className="whitespace-nowrap p-3 font-medium">{format(Number(r.adquisicion)+Number(r.alimentacion)+Number(r.sanidad)+Number(r.gastos_imputables))}</td>
-          <td className="whitespace-nowrap p-3">{format(r.ingresos_venta)}</td>
-          <td className="whitespace-nowrap p-3">{format(r.costo_reconocido)}</td>
-          <td className="whitespace-nowrap p-3 font-semibold">{format(r.utilidad_ventas)}</td>
-        </tr>)}</tbody>
-      </table></TableScroll>}
+   </details>
+   <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+     <h3 className="font-semibold">Lotes ({rows.length})</h3>
+     <button type="button" onClick={()=>setDesglose(x=>!x)} aria-pressed={desglose}
+      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50">
+      {desglose?'Vista simple':'Ver desglose completo'}
+     </button>
     </div>
-    <p className="text-xs text-slate-500">Nota: las cifras de utilidad excluyen gastos generales no imputados y descuentos comerciales no registrados.</p>
+    {!rows.length?<p className="p-5 text-sm text-slate-500">Sin lotes registrados.</p>:
+    <TableScroll><table className="min-w-full text-left text-sm">
+     <thead><tr>
+      <th className="whitespace-nowrap p-3 text-xs text-slate-500">Lote</th>
+      <th className="whitespace-nowrap p-3 text-xs text-slate-500">Animales</th>
+      {desglose&&['Adquisición','Bajas (incluidas)','Alimentación','Sanidad','Gastos'].map(t=><th key={t} className="whitespace-nowrap p-3 text-xs text-slate-500">{t}</th>)}
+      <th className="whitespace-nowrap p-3 text-xs text-slate-500">Costo total</th>
+      <th className="whitespace-nowrap p-3 text-xs text-slate-500">Ventas</th>
+      {desglose&&<th className="whitespace-nowrap p-3 text-xs text-slate-500">Costo reconocido</th>}
+      <th className="whitespace-nowrap p-3 text-xs text-slate-500">Utilidad</th>
+     </tr></thead>
+     <tbody className="divide-y divide-slate-100">{rows.map(r=><tr key={r.lote_id} className="hover:bg-slate-50">
+      <td className="whitespace-nowrap p-3 font-semibold">{r.codigo}</td><td className="p-3 tabular-nums">{r.cantidad_actual}</td>
+      {desglose&&<>
+       <td className="whitespace-nowrap p-3">{format(r.adquisicion)}</td>
+       <td className="whitespace-nowrap p-3 text-rose-800">{format(bajasPorLote[r.lote_id]??0)}</td>
+       <td className="whitespace-nowrap p-3">{format(r.alimentacion)}</td>
+       <td className="whitespace-nowrap p-3">{format(r.sanidad)}</td>
+       <td className="whitespace-nowrap p-3">{format(r.gastos_imputables)}</td>
+      </>}
+      <td className="whitespace-nowrap p-3 font-medium">{format(Number(r.adquisicion)+Number(r.alimentacion)+Number(r.sanidad)+Number(r.gastos_imputables))}</td>
+      <td className="whitespace-nowrap p-3">{format(r.ingresos_venta)}</td>
+      {desglose&&<td className="whitespace-nowrap p-3">{format(r.costo_reconocido)}</td>}
+      <td className="whitespace-nowrap p-3 font-semibold">{format(r.utilidad_ventas)}</td>
+     </tr>)}</tbody>
+    </table></TableScroll>}
+   </section>
   </>}
  </div>
 }

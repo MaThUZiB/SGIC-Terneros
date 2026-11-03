@@ -64,9 +64,9 @@ function SidebarIcon({name}:{name:string}){
 }
 
 export function SidebarNavigation({
-  current, esAdmin, open, onClose, onOpen, onNavigate,
+  current, esAdmin, open, onClose, onOpen, onNavigate, onLogout,
 }:{
-  current:ModuleId; esAdmin:boolean; open:boolean; onClose:()=>void; onOpen:()=>void; onNavigate:(id:ModuleId)=>void
+  current:ModuleId; esAdmin:boolean; open:boolean; onClose:()=>void; onOpen:()=>void; onNavigate:(id:ModuleId)=>void; onLogout:()=>void
 }){
   const sheetRef=useRef<HTMLElement>(null)
   const moreRef=useRef<HTMLButtonElement>(null)
@@ -159,6 +159,10 @@ export function SidebarNavigation({
             </div>
           })}
         </nav>
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <button type="button" onClick={()=>{onClose();onLogout()}}
+            className="min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Cerrar sesión</button>
+        </div>
       </section>
     </div>}
     <nav aria-label="Navegación principal móvil" className="sgic-bottom-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-slate-200 bg-white shadow-[0_-4px_24px_rgba(15,23,42,0.08)] lg:hidden">

@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { MOBILE_PRIMARY_MODULES, isMobileMoreModule } from '../utils/mobileNavigation'
 
 export type ModuleId =
   | 'resumen' | 'animales' | 'lotes' | 'inventario' | 'compras' | 'planes'
@@ -53,6 +54,7 @@ const paths: Record<string,string> = {
   settings:'M4 5h16M4 12h16M4 19h16M8 3v4m8 3v4m-5 3v4',
   history:'M4 12a8 8 0 1 0 2-5M4 4v5h5m3-2v5l4 2',
   users:'M16 19h6v-2a4 4 0 0 0-4-4h-2M8 19H2v-2a4 4 0 0 1 4-4h2m4-1a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm5-7a3 3 0 0 1 0 6',
+  plus:'M12 5v14M5 12h14',
 }
 
 function SidebarIcon({name}:{name:string}){
@@ -62,15 +64,31 @@ function SidebarIcon({name}:{name:string}){
 }
 
 export function SidebarNavigation({
-  current, esAdmin, open, onClose, onNavigate,
+  current, esAdmin, open, onClose, onOpen, onNavigate, onLogout,
 }:{
-  current:ModuleId; esAdmin:boolean; open:boolean; onClose:()=>void; onNavigate:(id:ModuleId)=>void
+  current:ModuleId; esAdmin:boolean; open:boolean; onClose:()=>void; onOpen:()=>void; onNavigate:(id:ModuleId)=>void; onLogout:()=>void
 }){
+  const sheetRef=useRef<HTMLElement>(null)
+  const moreRef=useRef<HTMLButtonElement>(null)
+  const directos:ModuleId[]=[...MOBILE_PRIMARY_MODULES]
+  const currentIsMore=isMobileMoreModule(current)
   useEffect(()=>{
     if(!open)return
-    const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')onClose()}
-    document.addEventListener('keydown',closeOnEscape)
-    return()=>document.removeEventListener('keydown',closeOnEscape)
+    sheetRef.current?.querySelector<HTMLButtonElement>('[data-menu-close]')?.focus()
+    const onKeyDown=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();onClose();moreRef.current?.focus()
+      }
+      if(event.key!=='Tab'||!sheetRef.current)return
+      const elements=Array.from(sheetRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'))
+      if(!elements.length)return
+      const first=elements[0],last=elements[elements.length-1]
+      if(!sheetRef.current.contains(document.activeElement)){event.preventDefault();first.focus();return}
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+    }
+    document.addEventListener('keydown',onKeyDown)
+    return()=>document.removeEventListener('keydown',onKeyDown)
   },[open,onClose])
 
   useEffect(()=>{
@@ -85,9 +103,7 @@ export function SidebarNavigation({
       <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-4">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-500 text-sm font-bold text-slate-950">SG</span>
         <div className="text-sm font-bold tracking-tight text-white">SGIC Terneros</div>
-        <button type="button" onClick={onClose} aria-label="Cerrar menú" className="ml-auto rounded-lg p-2 text-slate-300 hover:bg-slate-800 lg:hidden">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l14 14M19 5 5 19"/></svg>
-        </button>
+
       </div>
       <nav aria-label="Módulos del sistema" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4">
         {navigationGroups.map(group=>{
@@ -110,14 +126,60 @@ export function SidebarNavigation({
   }
 
   return <>
+    {/* Escritorio: navegación lateral completa. */}
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-slate-950 shadow-xl lg:flex">
       {body()}
     </aside>
-    {open&&<div className="fixed inset-0 z-50 lg:hidden">
-      <button type="button" className="absolute inset-0 h-full w-full bg-slate-950/70" aria-label="Cerrar navegación" onClick={onClose}/>
-      <aside className="mobile-navigation relative flex h-full w-[min(92vw,320px)] flex-col bg-slate-950 shadow-2xl" aria-label="Menú principal">
-        {body()}
-      </aside>
+
+    {/* Móvil: tres destinos habituales y un cuarto acceso a todos los módulos. */}
+    {open&&<div className="fixed inset-0 z-40 lg:hidden">
+      <button type="button" tabIndex={-1} aria-label="Cerrar más módulos"
+        className="absolute inset-0 h-full w-full bg-slate-950/50" onClick={onClose}/>
+      <section ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby="mobile-more-title"
+        className="sgic-more-panel absolute inset-x-2 max-h-[min(68dvh,600px)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:inset-x-6">
+        <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
+          <h2 id="mobile-more-title" className="text-base font-semibold">Más módulos</h2>
+          <button type="button" data-menu-close onClick={()=>{onClose();moreRef.current?.focus()}}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Cerrar más módulos">Cerrar</button>
+        </div>
+        <nav aria-label="Otros módulos" className="space-y-4">
+          {navigationGroups.map(group=>{
+            const entries=group.entries.filter(entry=>!directos.includes(entry.id)&&(esAdmin||!entry.adminOnly))
+            if(!entries.length)return null
+            return <div key={group.label}>
+              <h3 className="mb-2 text-xs font-semibold text-slate-500">{group.label}</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {entries.map(entry=><button type="button" key={entry.id}
+                  aria-current={current===entry.id?'page':undefined}
+                  onClick={()=>{onNavigate(entry.id);onClose()}}
+                  className={`flex min-h-12 items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm font-medium ${current===entry.id?'border-emerald-800 bg-emerald-50 text-emerald-900':'border-slate-200 bg-white text-slate-700'}`}>
+                  <span className="shrink-0"><SidebarIcon name={entry.icon}/></span><span className="min-w-0 break-words">{entry.title}</span>
+                </button>)}
+              </div>
+            </div>
+          })}
+        </nav>
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <button type="button" onClick={()=>{onClose();onLogout()}}
+            className="min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Cerrar sesión</button>
+        </div>
+      </section>
     </div>}
+    <nav aria-label="Navegación principal móvil" className="sgic-bottom-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-slate-200 bg-white shadow-[0_-4px_24px_rgba(15,23,42,0.08)] lg:hidden">
+      {directos.map(id=>{
+        const entry=navigationGroups.flatMap(g=>g.entries).find(e=>e.id===id)!
+        return <button type="button" key={id} onClick={()=>{onNavigate(id);if(open)onClose()}}
+          aria-current={current===id?'page':undefined}
+          className={`flex min-h-[60px] flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium ${current===id?'text-emerald-800':'text-slate-600'}`}>
+          <SidebarIcon name={entry.icon}/><span>{id==='resumen'?'Inicio':entry.title}</span>
+        </button>
+      })}
+      <button type="button" ref={moreRef} aria-haspopup="dialog" aria-expanded={open}
+        aria-label={currentIsMore?'Más módulos, sección actual: '+moduleTitles[current]:'Más módulos'}
+        onClick={()=>open?onClose():onOpen()}
+        className={`flex min-h-[60px] flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium ${open||currentIsMore?'text-emerald-800':'text-slate-600'}`}>
+        <SidebarIcon name="plus"/><span>Más</span>
+      </button>
+    </nav>
   </>
 }

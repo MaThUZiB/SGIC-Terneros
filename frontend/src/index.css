@@ -67,3 +67,22 @@ input[type="checkbox"], input[type="radio"] { min-height: 22px; width: 22px; hei
 .operation-panel { width: 100%; max-width: 48rem; margin-inline: auto; }
 .operation-panel-wide { max-width: 64rem; }
 @media (pointer: coarse) { .close-control { width: 44px; height: 44px; } }
+
+/* Barra inferior: evita superponer acciones y respeta las áreas seguras de iOS. */
+@media (max-width: 1023px) {
+  .sgic-bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+  .sgic-more-panel { bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .app-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .sgic-shell footer { margin-bottom: calc(66px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 639px) {
+  .sgic-bottom-nav button { -webkit-tap-highlight-color: transparent; }
+  .sgic-more-panel { max-height: min(65dvh, 520px); }
+}
+
+/* Mantener las cuatro etiquetas visibles incluso con zoom ampliado. */
+.sgic-bottom-nav button { min-width: 0; }
+.sgic-bottom-nav button > span:last-child {
+  display: block; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}

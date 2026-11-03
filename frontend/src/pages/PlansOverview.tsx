@@ -53,16 +53,22 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
   const [busy,setBusy]=useState(false)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [advertencia,setAdvertencia]=useState('')
   const [aviso,setAviso]=useState('')
   const [limitado,setLimitado]=useState(false)
   const [confirmacion,setConfirmacion]=useState<Confirmacion|null>(null)
 
   const cargar=useCallback(async()=>{
     if(!supabase){setError('Supabase no está configurado.');setLoading(false);return}
-    setLoading(true);setError('')
+    setLoading(true);setError('');setAdvertencia('')
     try{
-      const resultados=await Promise.all([
-        supabase.from('plan_consumo').select('id,nombre,descripcion,activo,modo_racion').order('nombre'),
+      // El catálogo maestro no debe depender del historial de consumo ni de otras tablas.
+      const planesResult=await supabase.from('plan_consumo')
+        .select('id,nombre,descripcion,activo,modo_racion').order('nombre')
+      if(planesResult.error)throw Error('No se pudieron consultar los planes: '+planesResult.error.message)
+      setPlanes((planesResult.data??[]) as Plan[])
+
+      const otros=await Promise.allSettled([
         supabase.from('detalle_plan_consumo').select('id,plan_id,producto_id,cantidad_diaria,unidad_id'),
         supabase.from('asignacion_plan_lote').select('id,plan_id,lote_id,fecha_inicio,fecha_fin,activo,observaciones,componentes,modo_racion').order('id'),
         supabase.from('producto').select('id,nombre'),
@@ -72,26 +78,37 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
         paginar('detalle_consumo','id,consumo_id,producto_id,cantidad,costo_total'),
         supabase.from('sgic_alimentacion_auto_evento').select('id,lote_id,asignacion_id,fecha,estado,animales,detalle').order('fecha',{ascending:false}).limit(1000)
       ])
-      for(const result of [...resultados.slice(0,6),resultados[8]]){
-        if('error' in result && result.error)throw result.error
+      const fallas:string[]=[]
+      function resultado<T>(indice:number,nombre:string):T[]{
+        const r=otros[indice]
+        if(r.status==='rejected'){
+          fallas.push(nombre);return []
+        }
+        const v=r.value as unknown as {data:T[]|null;error?:{message:string}|null}
+        if(v.error){fallas.push(nombre+': '+v.error.message);return []}
+        return v.data??[]
       }
-      const [p,d,a,pr,u,l]=resultados
-      const cs=resultados[6] as Awaited<ReturnType<typeof paginar>>
-      const ds=resultados[7] as Awaited<ReturnType<typeof paginar>>
-      setPlanes((p as {data:unknown}).data as Plan[]??[])
-      setDetalles((d as {data:unknown}).data as Detail[]??[])
-      setAsignaciones((a as {data:unknown}).data as Asignacion[]??[])
-      setProductos((pr as {data:unknown}).data as Producto[]??[])
-      setUnidades((u as {data:unknown}).data as Unidad[]??[])
-      const lotesCargados=((l as {data:unknown}).data as Lote[]??[])
+      function historial(indice:number,nombre:string):Awaited<ReturnType<typeof paginar>>{
+        const r=otros[indice]
+        if(r.status==='rejected'){fallas.push(nombre);return {datos:[],limitado:false}}
+        return r.value as Awaited<ReturnType<typeof paginar>>
+      }
+      setDetalles(resultado<Detail>(0,'Composición de planes'))
+      setAsignaciones(resultado<Asignacion>(1,'Asignaciones de planes'))
+      setProductos(resultado<Producto>(2,'Productos'))
+      setUnidades(resultado<Unidad>(3,'Unidades'))
+      const lotesCargados=resultado<Lote>(4,'Lotes')
       setLotes(lotesCargados)
       setSeleccion(prev=>prev||String(initialLoteId??lotesCargados.find(x=>x.estado==='ACTIVO')?.id??lotesCargados[0]?.id??''))
+      const cs=historial(5,'Historial de consumo')
+      const ds=historial(6,'Detalle de consumos')
       setConsumos(cs.datos as Consumo[])
       setDetalleConsumos(ds.datos as DetalleConsumo[])
       setLimitado(cs.limitado||ds.limitado)
-      setEventos((resultados[8] as {data:unknown}).data as EventoAutomatico[]??[])
+      setEventos(resultado<EventoAutomatico>(7,'Bitácora automática'))
+      if(fallas.length)setAdvertencia('Los planes se cargaron, pero faltan datos complementarios: '+fallas.join(' · ')+'.')
     }catch(e){
-      setError(e instanceof Error?e.message:'No se pudo consultar el seguimiento alimentario.')
+      setError(e instanceof Error?e.message:'No se pudo consultar el catálogo alimentario.')
     }finally{setLoading(false)}
   },[initialLoteId])
   useEffect(()=>{void cargar()},[cargar])
@@ -123,7 +140,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
     setError('');setAviso('')
     setConfirmacion({kind:'assign',planId:p.id,loteId:objetivo.id,details:{
       title:actual?'Cambiar plan del lote':'Asignar plan al lote',
-      description:'La modificación se aplica desde hoy. Los consumos ya registrados y sus costos no se borrarán. No se descuenta inventario hasta confirmar la alimentación diaria. Si hoy ya se confirmó el plan anterior, el cambio se deberá hacer mañana.',
+      description:'La modificación se aplica desde hoy. Los consumos ya registrados y sus costos no se borrarán. El inventario se descuenta automáticamente al cierre del día. Si ya se registró el plan anterior hoy, el cambio se deberá hacer mañana.',
       confirmLabel:actual?'Cambiar plan':'Asignar plan',
       summary:[{label:'Lote',value:objetivo.codigo},{label:'Plan anterior',value:actual?planNombre(actual.plan_id):'Sin plan'},{label:'Nuevo plan',value:p.nombre,emphasis:true}]
     }})
@@ -190,6 +207,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
       </div>
     </header>
     {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{error}</div>}
+    {advertencia&&<div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{advertencia}</div>}
     {aviso&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{aviso}</div>}
     {erroresAutomaticos.length>0&&<div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
       <strong>{erroresAutomaticos.length} jornada(s) de alimentación automática pendientes.</strong>

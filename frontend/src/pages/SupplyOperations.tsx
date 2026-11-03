@@ -4,8 +4,9 @@ import { supabase } from '../api/supabase'
 import { AnimalSearch } from '../components/AnimalSearch'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { parseClpAmount } from '../utils/clpInput'
+import { calcularRacionDiaria, sugerenciaPorAnimal, type ModoRacion } from '../utils/dailyRation'
 
-type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
+type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_actual?:number; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
 type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
 export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','consumoPlan','tratamiento','consumo']
@@ -24,6 +25,7 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
  const [request,setRequest]=useState(()=>crypto.randomUUID())
  const [confirm,setConfirm]=useState<ConfirmDetails|null>(null),[payload,setPayload]=useState<Record<string,unknown>|null>(null)
  const [amounts,setAmounts]=useState<Record<string,string>>({})
+ const [modoRacion,setModoRacion]=useState<ModoRacion>('LOTE')
  const [history,setHistory]=useState<PurchaseEntry[]>([]),[historyLoading,setHistoryLoading]=useState(false)
  const intake=action==='ingresoInsumo',plan=action==='consumoPlan',config=action==='configInsumo'
  async function load(){
@@ -75,6 +77,10 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
 
  const assign=lists.asignacion_plan_lote?.find(a=>String(a.id)===v.asignacion_id)
  const details=assign?.componentes??(lists.detalle_plan_consumo??[]).filter(d=>d.plan_id===assign?.plan_id)
+ const lineasRacion=details.map(d=>({id:d.id,producto_id:Number(d.producto_id),cantidad_diaria:Number(d.cantidad_diaria)}))
+ const cabezas=Number((lists.lote??[]).find(l=>l.id===assign?.lote_id)?.cantidad_actual??0)
+ const racion=calcularRacionDiaria(lineasRacion,amounts,modoRacion,cabezas,Object.fromEntries(lineasRacion.map(d=>[d.producto_id,Number(products.find(p=>p.id===d.producto_id)?.stock_actual??0)])))
+ const costoEstimado=racion.lineas.reduce((sum,line)=>sum+line.cantidad*Number(products.find(p=>p.id===line.producto_id)?.costo_promedio??0),0)
  const qty=num(v.cantidad??''),factor=pack?num(v.factor??''):1
  const price=v.precio==='0'?0:parseClpAmount(v.precio??'')
  const base=qty*factor, total=qty*(price??NaN)
@@ -119,10 +125,12 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
    let summary:ConfirmDetails['summary']
    if(plan){
     if(!assign||!details.length)throw Error('Selecciona una asignación con alimentos.')
-    const rows=details.map(d=>({detalle_id:d.id,cantidad:num(amounts[d.id]??String(d.cantidad_diaria))}))
-    if(rows.some(x=>!Number.isFinite(x.cantidad)||x.cantidad<0)||!rows.some(x=>x.cantidad>0))throw Error('Revisa las cantidades. Puedes usar cero para omitir un alimento.')
-    p={asignacion_id:assign.id,fecha:v.fecha,detalles:rows}
-    description=rows.map(d=>{const line=details.find(x=>x.id===d.detalle_id)!;const prod=products.find(x=>x.id===line.producto_id);return `${prod?.nombre}: ${d.cantidad} ${unit(prod)}`}).join('\n')+'\nSe descontarán estas cantidades una sola vez para esta asignación y fecha.'
+    if(racion.errores.length)throw Error(racion.errores.join(' '))
+     if(racion.stockInsuficiente.length)throw Error('Inventario insuficiente para: '+racion.stockInsuficiente.map(x=>products.find(p=>p.id===x.productoId)?.nombre+' ('+x.requerido+' / '+x.disponible+')').join('; '))
+     if(modoRacion==='ANIMAL'&&v.fecha!==today())throw Error('El cálculo por ternero solo está disponible para la fecha de hoy.')
+     const rows=racion.lineas.map(({detalle_id,cantidad})=>({detalle_id,cantidad}))
+     p={asignacion_id:assign.id,fecha:v.fecha,detalles:rows}
+    description=rows.map(d=>{const line=details.find(x=>x.id===d.detalle_id)!;const prod=products.find(x=>x.id===line.producto_id);return `${prod?.nombre}: ${d.cantidad} ${unit(prod)}`}).join('\n')+'\nEstos totales se descontarán una sola vez por lote y fecha. Costo estimado: '+money(costoEstimado)+'.'
    }else if(config){
     if(!product)throw Error('Selecciona un insumo.')
     p={producto_id:product.id,apto_plan:eligible};description=`${product.nombre}: ${eligible?'disponible':'no disponible'} para planes de alimentación.`
@@ -182,7 +190,23 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
      {!fresh&&<p className="text-xs text-slate-500">Puedes modificar la presentación de esta compra. Si cambias su equivalencia, se registrará otra presentación sin alterar compras anteriores.</p>}
     </div>}
    </>}
-   {plan&&<><Field label="Plan y lote"><select className={cls} required value={v.asignacion_id??''} onChange={e=>{set('asignacion_id',e.target.value);setAmounts({})}}><option value="">Seleccionar asignación</option>{(lists.asignacion_plan_lote??[]).filter(a=>a.activo).map(a=><option key={a.id} value={a.id}>{lists.plan_consumo?.find(p=>p.id===a.plan_id)?.nombre} · {lists.lote?.find(l=>l.id===a.lote_id)?.codigo}</option>)}</select></Field>{details.map(d=>{const p=products.find(p=>p.id===d.producto_id);return <Field key={d.id} label={`${p?.nombre??'Insumo inactivo'} · ${unit(p)} totales para el lote`}><input className={cls} required inputMode="decimal" value={amounts[d.id]??String(d.cantidad_diaria)} onChange={e=>setAmounts(prev=>({...prev,[d.id]:e.target.value}))}/><span className="block text-xs text-slate-500">Plan: {d.cantidad_diaria} · Disponible: {p?.stock_actual??0} {unit(p)}. Cero omite este alimento.</span></Field>})}</>}
+   {plan&&assign&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+     <strong>{(lists.lote??[]).find(l=>l.id===assign.lote_id)?.codigo??'Lote'} · {cabezas} animales activos</strong>
+     <p className="mt-1 text-xs text-slate-600">La receta original se define para todo el lote. Opcionalmente puedes ingresar la ración individual y calcular el total para los animales actuales, sin modificar el plan maestro.</p>
+     <div className="mt-3 grid grid-cols-2 gap-2">
+       <button type="button" aria-pressed={modoRacion==='LOTE'} onClick={()=>{setModoRacion('LOTE');setAmounts({})}} className={'rounded-lg px-3 py-2 text-xs font-semibold '+(modoRacion==='LOTE'?'bg-emerald-900 text-white':'border border-slate-300 bg-white')}>Total del lote</button>
+       <button type="button" aria-pressed={modoRacion==='ANIMAL'} disabled={cabezas<=0} onClick={()=>{setModoRacion('ANIMAL');setAmounts(sugerenciaPorAnimal(lineasRacion,cabezas))}} className={'rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 '+(modoRacion==='ANIMAL'?'bg-emerald-900 text-white':'border border-slate-300 bg-white')}>Por ternero</button>
+     </div>
+   </div>}
+   {plan&&<><Field label="Plan y lote"><select className={cls} required value={v.asignacion_id??''} onChange={e=>{set('asignacion_id',e.target.value);setAmounts({});setModoRacion('LOTE')}}><option value="">Seleccionar asignación</option>{(lists.asignacion_plan_lote??[]).filter(a=>a.activo).map(a=><option key={a.id} value={a.id}>{lists.plan_consumo?.find(p=>p.id===a.plan_id)?.nombre} · {lists.lote?.find(l=>l.id===a.lote_id)?.codigo}</option>)}</select></Field>{details.map(d=>{const p=products.find(p=>p.id===d.producto_id);return <Field key={d.id} label={`${p?.nombre??'Insumo inactivo'} · ${unit(p)} ${modoRacion==='ANIMAL'?'por ternero':'totales para el lote'}`}><input className={cls} required inputMode="decimal" value={amounts[d.id]??String(d.cantidad_diaria)} onChange={e=>setAmounts(prev=>({...prev,[d.id]:e.target.value}))}/><span className="block text-xs text-slate-500">Plan base: {d.cantidad_diaria} {unit(p)}/lote · Disponible: {p?.stock_actual??0} {unit(p)}. Cero omite este alimento. {modoRacion==='ANIMAL'?'Total calculado: '+(racion.lineas.find(l=>l.detalle_id===d.id)?.cantidad??0)+' '+unit(p)+'.':'Equivale a '+(racion.lineas.find(l=>l.detalle_id===d.id)?.porAnimal??0)+' '+unit(p)+' por ternero (referencial).'}</span></Field>})}</>}
+   {plan&&assign&&<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+     <strong className="text-emerald-950">Descuento de inventario previsto</strong>
+     <p className="mt-1 text-emerald-900">Costo aproximado: {money(costoEstimado)} al costo promedio actual. El inventario solo cambia al confirmar.</p>
+     {racion.lineas.map(line=><p key={line.detalle_id} className="mt-1 text-xs text-emerald-950">{products.find(p=>p.id===line.producto_id)?.nombre}: {line.cantidad} {unit(products.find(p=>p.id===line.producto_id))} totales ({line.porAnimal} por ternero)</p>)}
+     {racion.errores.map(e=><p key={e} className="mt-2 text-xs text-rose-800">{e}</p>)}
+     {racion.stockInsuficiente.map(x=><p key={x.productoId} className="mt-2 text-xs text-rose-800">Stock insuficiente: {products.find(p=>p.id===x.productoId)?.nombre}, requiere {x.requerido} y hay {x.disponible}.</p>)}
+     {modoRacion==='ANIMAL'&&<p className="mt-2 text-xs text-amber-900">Solo puedes registrar la jornada actual. Este cálculo estima alimento entregado; no representa ingesta individual.</p>}
+   </div>}
    {!intake&&!config&&!plan&&<>{action==='usoInsumo'&&select('finalidad','Uso',[{id:'ALIMENTACION',label:'Alimentación'},{id:'CAMA',label:'Cama'},{id:'TRATAMIENTO',label:'Tratamiento sanitario'},{id:'OTRO',label:'Otro uso'}])}<Field label="Destino"><select className={cls} value={v.destino} onChange={e=>set('destino',e.target.value)}>{v.finalidad==='TRATAMIENTO'&&<option value="animal">Animal individual</option>}<option value="lote">Lote</option>{v.finalidad!=='TRATAMIENTO'&&<option value="general">General del predio</option>}</select></Field>{v.destino==='lote'&&select('lote_id','Lote',(lists.lote??[]).filter(l=>l.estado==='ACTIVO').map(l=>({id:l.id,label:l.codigo!})))}{v.finalidad==='TRATAMIENTO'&&v.destino==='animal'&&<AnimalSearch options={(lists.animal??[]).filter(a=>a.estado==='ACTIVO').map(a=>({id:a.id,diio:a.diio!,detail:lists.lote?.find(l=>l.id===a.lote_id)?.codigo??''}))} value={v.animal_id??''} onChange={x=>set('animal_id',x)}/>} {input('motivo',v.finalidad==='PERDIDA'?'Motivo de la pérdida':'Motivo / observación')}</>}
    {!plan&&!config&&input('cantidad',`Cantidad (${intake&&pack?v.presentacion||'presentaciones':stockUnit||'unidad base'})`)}
    {intake&&<>{input('precio',`${v.tipo==='INICIAL'?'Valor':'Precio'} por ${pack?v.presentacion||'presentación':stockUnit||'unidad'} (CLP)`)}{!fresh&&product&&<p className="text-xs text-slate-600">{historyLoading?'Consultando precio de compra anterior…':previousPrice?'Último precio para esta presentación: '+money(Number(previousPrice.precio_unitario))+' ('+previousPrice.fecha+'). Puedes editarlo para esta compra.':'Sin precio anterior para esta presentación. Ingresa el precio actual.'}</p>}{v.tipo==='INICIAL'&&<p className="text-xs text-slate-600">Usa el costo conocido de la existencia inicial. Puedes indicar 0 si no está valorizada.</p>}{v.tipo==='COMPRA'&&<details className="rounded-xl border p-3"><summary className="cursor-pointer py-1 text-sm font-medium">Proveedor y documento (opcionales)</summary><div className="mt-3 space-y-3">{select('proveedor_id','Proveedor existente',(lists.proveedor??[]).filter(p=>p.activo).map(p=>({id:p.id,label:p.nombre!})),true)}{!v.proveedor_id&&input('proveedor_nombre','Nombre de proveedor nuevo',true)}{input('documento','Documento',true)}</div></details>}{Number.isFinite(total)&&Number.isFinite(base)&&<p className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-950">Ingresan <strong>{base} {stockUnit}</strong> · Total: <strong>{money(total)}</strong></p>}</>}

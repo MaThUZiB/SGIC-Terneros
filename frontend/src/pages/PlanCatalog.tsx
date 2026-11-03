@@ -11,6 +11,8 @@ type Props = {
   productos:Producto[]; unidades:Unidad[]; esAdmin:boolean; busy:boolean;
   onAssign:(loteId:number,planId:number)=>void
   onUnassign:(loteId:number)=>void
+  onCreatePlan:()=>void
+  onAddFood:()=>void
   onManage:(plan:Plan,accion:'ELIMINAR'|'ARCHIVAR'|'REACTIVAR')=>void
   onOpenLote:(loteId:number)=>void
   onModeChange:(planId:number,modo:'LOTE'|'ANIMAL')=>void
@@ -21,7 +23,7 @@ const control='w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 te
 const normalizar=(valor:string)=>valor.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim()
 
 /** Catálogo y asignaciones: cada plan es independiente de su seguimiento por lote. */
-export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidades,esAdmin,busy,onAssign,onUnassign,onManage,onOpenLote,onModeChange}:Props){
+export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidades,esAdmin,busy,onAssign,onUnassign,onManage,onOpenLote,onModeChange,onCreatePlan,onAddFood}:Props){
   const [busqueda,setBusqueda]=useState('')
   const [filtro,setFiltro]=useState<'TODOS'|'ACTIVOS'|'ARCHIVADOS'>('TODOS')
   const [seleccion,setSeleccion]=useState<number|null>(null)
@@ -40,7 +42,10 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
   const unidad=(id:number)=>unidades.find(u=>u.id===id)?.codigo??''
   return <section className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
     <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-base font-semibold">Planes <span className="ml-1 text-sm font-normal text-slate-500">({planes.length})</span></h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">Planes <span className="ml-1 text-sm font-normal text-slate-500">({planes.length})</span></h3>
+        {esAdmin&&<button type="button" onClick={onCreatePlan} className="rounded-lg bg-emerald-900 px-3 py-2 text-xs font-semibold text-white">+ Nuevo</button>}
+      </div>
       <label htmlFor="buscar-plan" className="sr-only">Buscar planes</label>
       <input id="buscar-plan" type="search" value={busqueda} onChange={e=>setBusqueda(e.target.value)} className={control+' mt-3'} placeholder="Buscar plan"/>
       <div className="mt-3 flex flex-wrap gap-2">{([['TODOS','Todos'],['ACTIVOS','Activos'],['ARCHIVADOS','Archivados']] as const).map(([id,label])=>
@@ -71,7 +76,10 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
           {actual.descripcion&&<p className="mt-1 text-sm text-slate-500">{actual.descripcion}</p>}
         </header>
         <div className="rounded-lg bg-slate-50 p-3">
-          <h4 className="text-sm font-semibold">Ración · {actual.modo_racion==='ANIMAL'?'por ternero':'por lote'}</h4>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold">Ración · {actual.modo_racion==='ANIMAL'?'por ternero':'por lote'}</h4>
+            {esAdmin&&actual.activo&&<button type="button" onClick={onAddFood} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium">+ Alimento</button>}
+          </div>
           {esAdmin&&asignacionesPlan.length===0&&<div className="mt-3 flex flex-wrap items-center gap-2">
             <label htmlFor="modo-plan" className="text-xs font-semibold">Calcular</label>
             <select id="modo-plan" className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm" disabled={busy}

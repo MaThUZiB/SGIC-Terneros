@@ -154,7 +154,7 @@ export function CloudWorkspacePage() {
     <div className="sgic-shell min-h-screen bg-[#f4f7f6] text-slate-900 lg:flex">
       <a href="#sgic-contenido" className="sr-only focus:not-sr-only fixed left-3 top-3 z-[100] rounded-lg bg-emerald-950 px-4 py-3 font-semibold text-white">Ir al contenido</a>
       <SidebarNavigation current={tab} esAdmin={esAdmin} open={menuOpen}
-        onClose={()=>setMenuOpen(false)} onOpen={()=>setMenuOpen(true)} onNavigate={abrirModulo}/>
+        onClose={()=>setMenuOpen(false)} onOpen={()=>setMenuOpen(true)} onNavigate={abrirModulo} onLogout={salir}/>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className="app-header border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:py-4 sm:px-7 lg:px-9">
@@ -170,7 +170,7 @@ export function CloudWorkspacePage() {
                 <div className="text-sm font-semibold">{user?.username}</div>
                 <div className="text-xs text-slate-500">{esAdmin?'Administrador':'Operador'}</div>
               </div>
-              <button type="button" onClick={salir} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Salir</button>
+              <button type="button" onClick={salir} className="hidden rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 lg:inline-flex">Salir</button>
             </div>
           </div>
         </header>

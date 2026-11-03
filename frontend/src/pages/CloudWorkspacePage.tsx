@@ -172,17 +172,13 @@ export function CloudWorkspacePage() {
 
   return (
     <div className="sgic-shell min-h-screen bg-[#f4f7f6] text-slate-900 lg:flex">
+      <a href="#sgic-contenido" className="sr-only focus:not-sr-only fixed left-3 top-3 z-[100] rounded-lg bg-emerald-950 px-4 py-3 font-semibold text-white">Ir al contenido</a>
       <SidebarNavigation current={tab} esAdmin={esAdmin} open={menuOpen}
-        onClose={()=>setMenuOpen(false)} onNavigate={abrirModulo}/>
+        onClose={()=>setMenuOpen(false)} onOpen={()=>setMenuOpen(true)} onNavigate={abrirModulo}/>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className="app-header border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:py-4 sm:px-7 lg:px-9">
             <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto">
-              <button type="button" aria-label="Abrir menú principal" aria-expanded={menuOpen}
-                className="rounded-xl border border-slate-200 p-2.5 text-slate-700 hover:bg-slate-50 lg:hidden"
-                onClick={()=>setMenuOpen(true)}>
-                <svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-              </button>
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-semibold tracking-tight text-slate-900">{moduleTitles[tab]}</h1>
               </div>
@@ -198,7 +194,7 @@ export function CloudWorkspacePage() {
             </div>
           </div>
         </header>
-        <main className="app-main mx-auto w-full min-w-0 max-w-[1440px] flex-1 space-y-4 px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
+        <main id="sgic-contenido" tabIndex={-1} className="app-main mx-auto w-full min-w-0 max-w-[1440px] flex-1 space-y-4 px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
 
           {demo&&<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-950">
             <strong>Entorno de demostración.</strong> Los registros DEMO son ficticios y no corresponden a operaciones empresariales reales.

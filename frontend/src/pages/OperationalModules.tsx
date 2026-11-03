@@ -312,19 +312,19 @@ export function OperationalModules({
     ?'Crear '+(catalogs.find(c=>c.id===fixedCatalogType)?.nombre.toLocaleLowerCase()??'registro')
     :S[action].title
   const panelHelp=action==='catalogo'&&fixedCatalogType?({raza:'Agrega una raza para identificar los animales.',proveedor:'Guarda el nombre del proveedor. RUT y correo son opcionales.',categoria_gasto:'Crea una categoría para organizar los gastos del negocio.',unidad_medida:'Define la unidad y su abreviatura para medir existencias.',categoria_producto:'Agrega una clasificación para los insumos.',producto:'Crea un producto sin existencias. Para ingresar stock, utiliza Inventario.',plan_consumo:'Los planes nuevos calculan la ración por ternero automáticamente. Luego añade los alimentos, asigna el plan al lote y SGIC descontará el stock cada jornada.',lote:'Crea un lote para agrupar los animales.'} as Record<string,string>)[fixedCatalogType]:S[action].help
-  return <section className="operation-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8" aria-label={panelTitle}>
-    <div className="mb-6 flex items-start justify-between gap-3 border-b border-slate-100 pb-5">
+  return <section className="operation-panel rounded-xl border border-slate-200 bg-white p-4 sm:p-6" aria-label={panelTitle}>
+    <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
       <div className="min-w-0">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-widest text-slate-400">Nuevo registro</p>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900">{panelTitle}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{panelHelp}</p>
+        
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900">{panelTitle}</h2>
+        {panelHelp&&<details className="mt-2 text-xs text-slate-600"><summary className="cursor-pointer font-medium">Ayuda</summary><p className="mt-2 leading-5">{panelHelp}</p></details>}
       </div>
       <CloseButton onClick={onClose} disabled={busy}/>
     </div>
     {error&&<p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {ok&&<p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{ok}</p>}
     <div className="mx-auto w-full max-w-2xl">
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-3.5">
           {S[action].fields.concat(more).map(f=>f.key==='tipo'&&fixedCatalogType?null:
             <div key={f.key} className="block text-sm">
               <label htmlFor={fieldId+f.key} className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
@@ -367,7 +367,7 @@ export function OperationalModules({
               className="mt-3 rounded-xl border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-white">
               + Agregar otro {action==='compraAnimal'?'ternero':'producto'}
             </button>
-            <p className="mt-2 text-xs text-emerald-900">Se incluirá el formulario actual solo cuando contenga datos completos. Todos los detalles se registran en una transacción.</p>
+            
           </div>}
           {(action==='venta'||action==='borradorVenta'||action==='division')&&<fieldset className="rounded-xl border border-slate-200 p-4">
             <legend className="px-2 text-sm font-semibold">Seleccionar animales ({selected.length})</legend>
@@ -387,7 +387,7 @@ export function OperationalModules({
                 aria-label={'Quitar DIIO '+o.diio}>{o.diio} ×</button>)}
             </div>}
           </fieldset>}
-          {action!=='catalogo'&&<p className="rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-500">El registro quedará en el historial. Compras confirmadas, fallecimientos y ventas no admiten eliminación directa.</p>}
+          
           <button disabled={loading||busy} className="w-full rounded-xl bg-emerald-900 px-5 py-3 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
             {busy?'Registrando…':action==='compraInsumo'?(values.confirmar_ahora==='NO'?'Guardar borrador':'Comprar y actualizar inventario'):action==='catalogo'?'Guardar registro':'Registrar operación'}
           </button>
@@ -428,14 +428,16 @@ export function OperationsHistory({esAdmin}:{esAdmin:boolean}){
     return()=>{mounted=false}
   },[view])
   return <section className="space-y-4">
-    <div className="flex flex-wrap gap-2">
-      {Object.keys(views).filter(t=>esAdmin||t!=='registro_auditoria').map(t=>
-        <button key={t} onClick={()=>setView(t)} className={'rounded-xl border px-3 py-2 text-sm '+(t===view?'border-emerald-900 bg-emerald-900 text-white':'border-slate-200 bg-white text-slate-700')}>
-          {t.replaceAll('_',' ')}
-        </button>)}
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+      <label htmlFor="historial-modulo" className="text-sm font-semibold text-slate-700">Ver registros de</label>
+      <select id="historial-modulo" value={view} onChange={e=>setView(e.target.value)}
+        className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm sm:max-w-xs">
+        {Object.keys(views).filter(t=>esAdmin||t!=='registro_auditoria').map(t=>
+          <option key={t} value={t}>{t.replaceAll('_',' ')}</option>)}
+      </select>
     </div>
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <h2 className="border-b border-slate-100 p-5 font-semibold">Historial · {view.replaceAll('_',' ')}</h2>
+      <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">Historial · {view.replaceAll('_',' ')} <span className="font-normal text-slate-500">({data.length})</span></h2>
       {failure&&<p className="p-5 text-sm text-red-700">{failure}</p>}
       {!failure&&!data.length&&<p className="p-5 text-sm text-slate-500">Sin registros</p>}
       {!failure&&data.length>0&&<TableScroll><table className="min-w-full text-left text-sm">

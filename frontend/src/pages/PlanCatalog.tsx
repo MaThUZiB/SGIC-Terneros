@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Asignacion, ComponentePlan } from '../utils/feedingTracking'
 
-type Plan = { id:number; nombre:string; descripcion:string|null; activo:boolean }
+type Plan = { id:number; nombre:string; descripcion:string|null; activo:boolean; modo_racion:'LOTE'|'ANIMAL' }
 type Detalle = ComponentePlan & {plan_id:number}
 type Lote = { id:number; codigo:string; cantidad_actual:number; estado:string }
 type Producto = {id:number;nombre:string}
@@ -12,13 +12,14 @@ type Props = {
   onAssign:(loteId:number,planId:number)=>void
   onManage:(plan:Plan,accion:'ELIMINAR'|'ARCHIVAR'|'REACTIVAR')=>void
   onOpenLote:(loteId:number)=>void
+  onModeChange:(planId:number,modo:'LOTE'|'ANIMAL')=>void
 }
 const formato=(n:number)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:3}).format(n)
 const fecha=(s:string)=>s.split('-').reverse().join('-')
 const control='w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700'
 
 /** Catálogo y asignaciones: cada plan es independiente de su seguimiento por lote. */
-export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidades,esAdmin,busy,onAssign,onManage,onOpenLote}:Props){
+export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidades,esAdmin,busy,onAssign,onManage,onOpenLote,onModeChange}:Props){
   const [busqueda,setBusqueda]=useState('')
   const [filtro,setFiltro]=useState<'TODOS'|'ACTIVOS'|'ARCHIVADOS'>('TODOS')
   const [seleccion,setSeleccion]=useState<number|null>(null)
@@ -52,7 +53,7 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
             className={'w-full rounded-xl border p-4 text-left '+(actual?.id===p.id?'border-emerald-600 bg-emerald-50':'border-slate-200 hover:border-emerald-300')}>
             <span className="flex flex-wrap items-center justify-between gap-2"><strong className="min-w-0 break-words text-sm">{p.nombre}</strong>
               <span className={'rounded-full px-2 py-1 text-xs '+(p.activo?'bg-emerald-100 text-emerald-800':'bg-slate-200 text-slate-700')}>{p.activo?'Activo':'Archivado'}</span></span>
-            <span className="mt-2 block text-xs text-slate-600">{detalles.filter(d=>d.plan_id===p.id).length} alimentos · {actuales.length} lotes vigentes · {asignadas.length} asignaciones históricas</span>
+            <span className="mt-2 block text-xs text-slate-600">{detalles.filter(d=>d.plan_id===p.id).length} alimentos · {actuales.length} lotes vigentes · {asignadas.length} asignaciones históricas · {p.modo_racion==='ANIMAL'?'Por ternero':'Por lote'}</span>
             {actuales.length>0&&<span className="mt-2 block break-words text-xs text-emerald-800">{actuales.map(a=>lotes.find(l=>l.id===a.lote_id)?.codigo??'Lote #'+a.lote_id).join(' · ')}</span>}
           </button>
         })}
@@ -65,11 +66,19 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
           <p className="mt-2 text-sm text-slate-600">{actual.descripcion||'Sin descripción'}</p>
         </header>
         <div className="rounded-xl bg-slate-50 p-4">
-          <h4 className="text-sm font-semibold">Ración diaria del lote completo</h4>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Las cantidades del plan son totales por lote, no por ternero. La asignación conserva una instantánea de su composición.</p>
+          <h4 className="text-sm font-semibold">Ración diaria · {actual.modo_racion==='ANIMAL'?'por ternero':'total por lote'}</h4>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{actual.modo_racion==='ANIMAL'?'Cada día se multiplica esta dosis por los animales actuales del lote.':'Estas cantidades se descuentan fijas por lote y día.'} Cada asignación conserva su propia modalidad y composición.</p>
+          {esAdmin&&asignacionesPlan.length===0&&<div className="mt-3 flex flex-wrap items-center gap-2">
+            <label htmlFor="modo-plan" className="text-xs font-semibold">Modalidad del plan</label>
+            <select id="modo-plan" className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm" disabled={busy}
+              value={actual.modo_racion} onChange={e=>onModeChange(actual.id,e.target.value as 'LOTE'|'ANIMAL')}>
+              <option value="ANIMAL">Por ternero (automático según censo)</option>
+              <option value="LOTE">Cantidad fija por lote</option>
+            </select>
+          </div>}
           {componentes.length===0?<p className="mt-3 text-sm text-amber-800">Plan sin alimentos. Agrega productos desde «Agregar producto a plan» antes de asignarlo.</p>:
             <div className="mt-3 space-y-2">{componentes.map(d=><div key={d.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 text-sm last:border-0">
-              <span>{producto(d.producto_id)}</span><strong className="tabular-nums">{formato(Number(d.cantidad_diaria))} {unidad(d.unidad_id)}/día</strong>
+              <span>{producto(d.producto_id)}</span><strong className="tabular-nums">{formato(Number(d.cantidad_diaria))} {unidad(d.unidad_id)}/{actual.modo_racion==='ANIMAL'?'ternero':'lote'} por día</strong>
             </div>)}</div>}
         </div>
         <section><h4 className="text-sm font-semibold">Lotes con este plan ({vigentes.length})</h4>
@@ -86,7 +95,7 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
         </section>
         {esAdmin&&actual.activo&&<section className="rounded-xl border border-slate-200 p-4">
           <h4 className="text-sm font-semibold">Asignar plan a un lote</h4>
-          <p className="mt-1 text-xs text-slate-500">Puedes asignarlo a un lote sin plan o sustituir otro vigente. No registra consumo ni descuenta stock.</p>
+          <p className="mt-1 text-xs text-slate-500">Puedes asignarlo a un lote sin plan o sustituir otro vigente. Los consumos se descontarán automáticamente al cierre de cada jornada, sin confirmarlos.</p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <select className={control} aria-label="Lote al que asignar el plan" value={destino} onChange={e=>setDestino(e.target.value)}>
               <option value="">Seleccionar lote activo</option>

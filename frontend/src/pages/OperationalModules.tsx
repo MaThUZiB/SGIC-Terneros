@@ -1,5 +1,7 @@
 import { CloseButton } from '../components/CloseButton'
 import { TableScroll } from '../components/TableScroll'
+import { Pagination } from '../components/Pagination'
+import { PAGE_SIZE,pageRange } from '../utils/pagination'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import type { ModuleId } from '../components/SidebarNavigation'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
@@ -414,19 +416,31 @@ export function OperationsHistory({esAdmin}:{esAdmin:boolean}){
   const [view,setView]=useState('movimiento_inventario')
   const [data,setData]=useState<Record<string,unknown>[]>([])
   const [failure,setFailure]=useState('')
+  const [page,setPage]=useState(0)
+  const [total,setTotal]=useState(0)
+  const [loading,setLoading]=useState(true)
+  useEffect(()=>setPage(0),[view])
   useEffect(()=>{
-    let mounted=true
+    let active=true
     async function load(){
       if(!supabase)return
-      const result=await supabase.from(view).select('*').order('id',{ascending:false}).limit(250)
-      if(mounted){
-        if(result.error){setFailure(result.error.message);setData([])}
-        else{setFailure('');setData((result.data||[]) as Record<string,unknown>[])}
-      }
+      setLoading(true);setFailure('')
+      const {from,to}=pageRange(page)
+      try{
+        const result=await supabase.from(view).select('*',{count:'exact'})
+          .order('id',{ascending:false}).range(from,to)
+        if(result.error)throw new Error(result.error.message)
+        if(!active)return
+        const count=result.count??0
+        if(from>=count&&page>0){setPage(Math.max(0,Math.ceil(count/PAGE_SIZE)-1));return}
+        setTotal(count);setData((result.data??[]) as Record<string,unknown>[])
+      }catch(e){
+        if(active){setFailure(e instanceof Error?e.message:'No se pudo cargar el historial');setData([])}
+      }finally{if(active)setLoading(false)}
     }
     void load()
-    return()=>{mounted=false}
-  },[view])
+    return()=>{active=false}
+  },[view,page])
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
       <label htmlFor="historial-modulo" className="text-sm font-semibold text-slate-700">Ver registros de</label>
@@ -437,15 +451,17 @@ export function OperationsHistory({esAdmin}:{esAdmin:boolean}){
       </select>
     </div>
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">Historial · {view.replaceAll('_',' ')} <span className="font-normal text-slate-500">({data.length})</span></h2>
+      <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">Historial · {view.replaceAll('_',' ')} <span className="font-normal text-slate-500">({total})</span></h2>
+      {loading&&<p role="status" className="p-4 text-sm text-slate-500">Cargando registros…</p>}
       {failure&&<p className="p-5 text-sm text-red-700">{failure}</p>}
-      {!failure&&!data.length&&<p className="p-5 text-sm text-slate-500">Sin registros</p>}
-      {!failure&&data.length>0&&<TableScroll><table className="min-w-full text-left text-sm">
+      {!loading&&!failure&&!data.length&&<p className="p-5 text-sm text-slate-500">Sin registros</p>}
+      {!loading&&!failure&&data.length>0&&<TableScroll><table className="min-w-full text-left text-sm">
         <thead><tr>{['id',...views[view]].map(f=><th key={f} className="whitespace-nowrap p-3 text-xs uppercase text-slate-500">{f.replaceAll('_',' ')}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{data.map((r,i)=><tr key={String(r.id||i)}>
           {['id',...views[view]].map(f=><td key={f} className="whitespace-nowrap p-3">{r[f]===null?'—':String(r[f]??'')}</td>)}
         </tr>)}</tbody>
       </table></TableScroll>}
+      {!loading&&!failure&&<Pagination page={page} total={total} onChange={setPage} label={view.replaceAll('_',' ')}/>}
     </div>
   </section>
 }

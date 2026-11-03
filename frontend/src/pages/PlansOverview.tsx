@@ -48,7 +48,6 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
   const [detalleConsumos,setDetalleConsumos]=useState<DetalleConsumo[]>([])
   const [eventos,setEventos]=useState<EventoAutomatico[]>([])
   const [seleccion,setSeleccion]=useState(String(initialLoteId??''))
-  const [nuevoPlan,setNuevoPlan]=useState('')
   const [vista,setVista]=useState<'planes'|'lotes'>(initialLoteId?'lotes':'planes')
   const [busy,setBusy]=useState(false)
   const [loading,setLoading]=useState(true)
@@ -128,7 +127,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
     return grupos
   },[detalleConsumos])
 
-  function solicitarCambio(loteId:number=Number(seleccion),planId:number=Number(nuevoPlan)){
+  function solicitarCambio(loteId:number,planId:number){
     const objetivo=lotes.find(l=>l.id===loteId)
     const actual=vigentes.find(a=>a.lote_id===loteId)
     if(!objetivo||!planId)return setError('Selecciona un lote y un plan.')
@@ -145,14 +144,16 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
       summary:[{label:'Lote',value:objetivo.codigo},{label:'Plan anterior',value:actual?planNombre(actual.plan_id):'Sin plan'},{label:'Nuevo plan',value:p.nombre,emphasis:true}]
     }})
   }
-  function solicitarDesasignar(){
-    if(!lote||!vigente)return
+  function solicitarDesasignar(loteId:number){
+    const objetivo=lotes.find(l=>l.id===loteId)
+    const asignacion=vigentes.find(a=>a.lote_id===loteId)
+    if(!objetivo||!asignacion)return
     setError('');setAviso('')
-    setConfirmacion({kind:'unassign',loteId:lote.id,details:{
+    setConfirmacion({kind:'unassign',loteId:objetivo.id,details:{
       title:'Desasignar plan alimentario',
       description:'Se terminará la vigencia del plan desde hoy. La asignación y todos los consumos anteriores permanecerán en el historial. Si ya se registró alimentación hoy, ese día se conserva como ejecutado.',
       confirmLabel:'Confirmar desasignación',danger:true,
-      summary:[{label:'Lote',value:lote.codigo},{label:'Plan a finalizar',value:planNombre(vigente.plan_id)}]
+      summary:[{label:'Lote',value:objetivo.codigo},{label:'Plan a finalizar',value:planNombre(asignacion.plan_id)}]
     }})
   }
   function solicitarGestionPlan(p:Plan,accion:'ELIMINAR'|'ARCHIVAR'|'REACTIVAR'){
@@ -184,7 +185,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
         ?await supabase.rpc('sgic_desasignar_plan',{p_lote_id:cambio.loteId,p_fecha:hoy()})
         :await supabase.rpc('sgic_gestionar_plan',{p_plan_id:cambio.planId!,p_accion:cambio.accion!})
       if(rpc.error)throw rpc.error
-      setConfirmacion(null);setNuevoPlan('')
+      setConfirmacion(null)
       setAviso(cambio.kind==='assign'?'Asignación actualizada. El historial anterior se conserva.':cambio.kind==='unassign'?'Plan desasignado. No se alteró el inventario ni los consumos anteriores.':cambio.accion==='ELIMINAR'?'Plan eliminado.':cambio.accion==='ARCHIVAR'?'Plan archivado.':'Plan reactivado.')
       await cargar()
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el cambio.')}
@@ -196,32 +197,28 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
   const componentesVigentes=vigente?.componentes??[]
   const totalLotesConPlan=new Set(vigentes.map(a=>a.lote_id)).size
   return <section className="space-y-5">
-    <header className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Producción · alimentación</p>
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Gestión de alimentación</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Administra los planes por separado, consulta los lotes que los utilizan y revisa los consumos calculados automáticamente. El sistema aplica el plan al cierre de cada día, sin confirmación manual.</p>
-        </div>
-        <button type="button" onClick={()=>void cargar()} disabled={loading||busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Actualizar datos</button>
-      </div>
+    <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <div><h2 className="text-lg font-semibold">Alimentación</h2>
+        <p className="text-xs text-slate-500">{vista==='planes'?'Planes y asignaciones':'Consulta del consumo por lote'}</p></div>
+      <button type="button" onClick={()=>void cargar()} disabled={loading||busy} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">Actualizar</button>
     </header>
     {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{error}</div>}
     {advertencia&&<div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">{advertencia}</div>}
     {aviso&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{aviso}</div>}
     {erroresAutomaticos.length>0&&<div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-      <strong>{erroresAutomaticos.length} jornada(s) de alimentación automática pendientes.</strong>
-      <p className="mt-1">Revisa el inventario o la configuración del plan. SGIC reintentará el descuento automáticamente cuando la condición se resuelva.</p>
-      {erroresAutomaticos.slice(0,5).map(e=><p key={e.id} className="mt-1 text-xs">{lotes.find(l=>l.id===e.lote_id)?.codigo??'Lote #'+e.lote_id} · {fecha(e.fecha)} · {e.detalle}</p>)}
+      <strong>{erroresAutomaticos.length} jornadas pendientes · Revisar inventario</strong>
+      <details className="mt-2"><summary className="cursor-pointer text-xs font-medium">Ver causas</summary>
+        <div className="mt-2 space-y-1">{erroresAutomaticos.slice(0,10).map(e=><p key={e.id} className="text-xs">{lotes.find(l=>l.id===e.lote_id)?.codigo??'Lote #'+e.lote_id} · {fecha(e.fecha)} · {e.detalle}</p>)}</div>
+      </details>
     </div>}
     {limitado&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">El historial supera los 10.000 registros consultados. Los totales pueden ser parciales; consulta el histórico completo antes de tomar decisiones de costos.</div>}
     {loading?<p className="rounded-xl bg-white p-6 text-sm text-slate-600">Calculando seguimiento alimentario…</p>:<>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Planes definidos</p><strong className="mt-2 block text-2xl">{planes.length}</strong></div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Lotes con plan vigente</p><strong className="mt-2 block text-2xl">{totalLotesConPlan}</strong></div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Lotes sin plan vigente</p><strong className="mt-2 block text-2xl">{lotes.filter(x=>x.estado==='ACTIVO'&&!vigentes.some(a=>a.lote_id===x.id)).length}</strong></div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+        <span><strong className="tabular-nums">{planes.length}</strong> planes</span>
+        <span><strong className="tabular-nums">{totalLotesConPlan}</strong> lotes con plan</span>
+        <span className="text-slate-500">{lotes.filter(x=>x.estado==='ACTIVO'&&!vigentes.some(a=>a.lote_id===x.id)).length} lotes sin plan</span>
       </div>
-      <nav aria-label="Vistas de alimentación" className="flex flex-wrap gap-2">
+      <nav aria-label="Vistas de alimentación" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
         <button type="button" aria-pressed={vista==='planes'} onClick={()=>setVista('planes')}
           className={'rounded-xl px-4 py-2.5 text-sm font-semibold '+(vista==='planes'?'bg-emerald-900 text-white':'border border-slate-200 bg-white text-slate-700')}>Gestión de planes</button>
         <button type="button" aria-pressed={vista==='lotes'} onClick={()=>setVista('lotes')}
@@ -229,15 +226,15 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
       </nav>
       {vista==='lotes'&&<>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <label htmlFor="seguimiento-lote" className="mb-2 block text-sm font-semibold">Seguimiento del lote</label>
-            <select id="seguimiento-lote" className={control+' max-w-lg'} value={seleccion} onChange={e=>{setSeleccion(e.target.value);onSelectLote?.(Number(e.target.value));setNuevoPlan('');setError('');setAviso('')}}>
+            <label htmlFor="seguimiento-lote" className="mb-1 block text-xs font-semibold text-slate-600">Lote</label>
+            <select id="seguimiento-lote" className={control+' max-w-lg'} value={seleccion} onChange={e=>{setSeleccion(e.target.value);onSelectLote?.(Number(e.target.value));setError('');setAviso('')}}>
               {lotes.length===0&&<option value="">Sin lotes</option>}
               {lotes.map(x=><option key={x.id} value={x.id}>{x.codigo} · {x.cantidad_actual} animales · {x.estado==='ACTIVO'?'Activo':'Cerrado'}</option>)}
             </select>
           </div>
-          {vigente&&<span className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">Descuento programado automáticamente al cierre del día</span>}
+          {vigente&&<span className="text-xs font-medium text-emerald-800">Consumo automático</span>}
         </div>
         {lote&&<>
           <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -245,48 +242,37 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Plan vigente</p>
                 <p className="mt-1 font-semibold text-slate-900">{planActivoLote?.nombre??'Sin plan asignado'}</p>
-                <p className="mt-1 text-xs text-slate-600">{vigente?'Desde '+fecha(vigente.fecha_inicio):'Puedes asignar un plan a este lote para comenzar su seguimiento.'} · {lote.cantidad_actual} animales activos</p>
+                <p className="mt-1 text-xs text-slate-600">{vigente?'Desde '+fecha(vigente.fecha_inicio):'Sin plan vigente'} · {lote.cantidad_actual} animales</p>
               </div>
               <span className={'rounded-full px-3 py-1 text-xs font-semibold '+(vigente?'bg-emerald-100 text-emerald-800':'bg-slate-200 text-slate-700')}>{vigente?'Asignado':'Sin asignar'}</span>
             </div>
-            {componentesVigentes.length>0&&<div className="mt-3 flex flex-wrap gap-2">{componentesVigentes.map(c=><span key={c.id} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs">{productoNombre(c.producto_id)}: {cantidad(Number(c.cantidad_diaria))} {unidadNombre(c.unidad_id)}/{vigente?.modo_racion==='ANIMAL'?'ternero':'lote'} · Total previsto: {cantidad(Number(c.cantidad_diaria)*(vigente?.modo_racion==='ANIMAL'?(lote?.cantidad_actual??0):1))} {unidadNombre(c.unidad_id)}/día</span>)}</div>}
-            {lote.cantidad_original!==lote.cantidad_actual&&vigente&&<p className="mt-3 text-xs font-medium text-amber-800">Atención: este lote pasó de {lote.cantidad_original} a {lote.cantidad_actual} animales. {vigente?.modo_racion==='ANIMAL'?'La ración individual se ajustará automáticamente al número actual de animales al ejecutar el cargo.':'Este plan antiguo utiliza una cantidad fija por lote; el cambio de animales no modifica su total. Puedes crear otro plan por ternero.'}</p>}
+            {componentesVigentes.length>0&&<div className="mt-3 flex flex-wrap gap-2">{componentesVigentes.map(c=><span key={c.id} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs">{productoNombre(c.producto_id)} · {cantidad(Number(c.cantidad_diaria)*(vigente?.modo_racion==='ANIMAL'?(lote?.cantidad_actual??0):1))} {unidadNombre(c.unidad_id)}/día</span>)}</div>}
+            {lote.cantidad_original!==lote.cantidad_actual&&vigente?.modo_racion==='LOTE'&&<p className="mt-2 text-xs text-amber-800">Ración fija: el número de animales ha cambiado; revisa este plan en Gestión.</p>}
           </div>
-          {esAdmin&&lote.estado==='ACTIVO'&&<div className="mb-4 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[1fr_auto] md:items-end">
-            <div><label htmlFor="nuevo-plan" className="mb-2 block text-sm font-semibold">{vigente?'Cambiar a otro plan':'Asignar plan'}</label>
-              <select id="nuevo-plan" value={nuevoPlan} onChange={e=>setNuevoPlan(e.target.value)} className={control}>
-                <option value="">Seleccionar plan</option>
-                {planes.filter(p=>p.activo&&p.id!==vigente?.plan_id).map(p=><option value={p.id} key={p.id}>{p.nombre}</option>)}
-              </select>
-              <p className="mt-2 text-xs text-slate-500">Aplicación desde hoy. El plan anterior queda en el historial; no se altera el stock.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={()=>solicitarCambio()} disabled={!nuevoPlan||busy} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{vigente?'Cambiar plan':'Asignar plan'}</button>
-              {vigente&&<button type="button" onClick={solicitarDesasignar} disabled={busy} className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50">Desasignar</button>}
-            </div>
-          </div>}
         </>}
       </div>
       {lote&&<div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ['Días con plan',resumen.diasProgramados,'Desde las fechas de asignación'],
-            ['Días registrados',resumen.diasRegistrados,String(resumen.diasConfirmadosPlan)+' desde plan; '+String(resumen.diasConRegistroManual)+' con registro manual'],
-            ['Días pendientes',resumen.diasSinRegistro,'El cálculo se ejecuta al final del día; un fallo de stock queda pendiente'],
-            ['Costo registrado',clp(resumen.costoTotal),'Alimentación imputada al lote']
-          ].map(([label,value,nota])=><div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-medium text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{nota}</p>
+            ['Días con plan',resumen.diasProgramados],
+            ['Días registrados',resumen.diasRegistrados],
+            ['Pendientes',resumen.diasSinRegistro],
+            ['Costo acumulado',clp(resumen.costoTotal)]
+          ].map(([label,value])=><div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <p className="text-xs text-slate-500">{label}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
           </div>)}
         </div>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 p-5"><h3 className="font-semibold">Consumo acumulado por producto</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Planificado: ración por lote, o por animal × censo; para fechas sin ejecución se utiliza el censo actual como estimación. Real durante plan: consumos registrados en esas fechas. Total real: incluye consumos fuera de un plan. Los valores no representan necesariamente alimento ingerido individualmente.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+            <h3 className="font-semibold">Consumo por producto</h3>
+            <details className="text-xs text-slate-500"><summary className="cursor-pointer">Cómo se calcula</summary>
+              <p className="mt-2 max-w-lg">Planificado: ración × días (y animales, si corresponde). Registrado: movimiento imputado al lote. No equivale a ingesta medida.</p>
+            </details>
           </div>
           {resumen.productos.length===0?<p className="p-5 text-sm text-slate-500">Aún no hay cantidades programadas ni consumos registrados.</p>:
             <TableScroll><table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{['Insumo','Planificado','Registrado durante plan','Total registrado','Costo registrado'].map(c=><th className="whitespace-nowrap p-3" key={c}>{c}</th>)}</tr></thead>
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{['Insumo','Previsto','Durante plan','Total','Costo'].map(c=><th className="whitespace-nowrap p-3" key={c}>{c}</th>)}</tr></thead>
               <tbody className="divide-y divide-slate-100">{resumen.productos.map(p=>{
                 const unidad=unidades.find(u=>asignaciones.flatMap(a=>a.componentes??[]).some(c=>c.producto_id===p.productoId&&c.unidad_id===u.id))?.codigo??''
                 return <tr key={p.productoId}><td className="p-3 font-semibold">{productoNombre(p.productoId)}</td>
@@ -298,10 +284,9 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
             </table></TableScroll>}
           {resumen.diasSinPlanConConsumo>0&&<p className="px-5 pb-4 text-xs text-amber-800">Hay registros de alimentación en {resumen.diasSinPlanConConsumo} día(s) sin un plan vigente. Están incluidos en el total real, pero no en el comparativo durante plan.</p>}
         </section>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h3 className="font-semibold">Calendario de seguimiento</h3>
-            <p className="mb-4 mt-1 text-xs text-slate-500">Últimos 21 días planificados hasta hoy; no incluye fechas futuras.</p>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <details className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="cursor-pointer font-semibold">Calendario · últimas 21 jornadas</summary>
             {resumen.diasRecientes.length===0?<p className="text-sm text-slate-500">Sin días programados hasta la fecha.</p>:
               <div className="max-h-80 space-y-2 overflow-y-auto">{resumen.diasRecientes.map(d=><div key={d.fecha} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
                 <span>{fecha(d.fecha)}</span>
@@ -309,10 +294,9 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
                   {d.confirmadoPlan?'Plan registrado'+(d.registros>1?' · otros registros':''):d.registrado?'Registro manual':'Pendiente de cierre automático'}
                 </span>
               </div>)}</div>}
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h3 className="font-semibold">Historial de asignaciones</h3>
-            <p className="mb-4 mt-1 text-xs text-slate-500">Los cambios no eliminan la composición ni el historial de consumos.</p>
+          </details>
+          <details className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="cursor-pointer font-semibold">Historial de planes · {asignacionesLote.length}</summary>
             {asignacionesLote.length===0?<p className="text-sm text-slate-500">Este lote aún no tiene planes asignados.</p>:
               <div className="max-h-80 space-y-2 overflow-y-auto">{asignacionesLote.map(a=><div key={a.id} className="rounded-xl border border-slate-200 p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
@@ -323,12 +307,10 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
                 {a.observaciones?.includes('SGIC_SIN_EJECUCION')&&<p className="mt-1 text-xs text-amber-800">Reemplazado o desasignado el mismo día, sin ejecución</p>}
                 <p className="mt-2 text-xs text-slate-600">{(a.componentes??[]).map(c=>productoNombre(c.producto_id)+' '+cantidad(Number(c.cantidad_diaria))+' '+unidadNombre(c.unidad_id)+'/día').join(' · ')||'Sin ingredientes registrados'}</p>
               </div>)}</div>}
-          </section>
+          </details>
         </div>
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 p-5"><h3 className="font-semibold">Últimos consumos registrados</h3>
-            <p className="mt-1 text-xs text-slate-500">Movimientos automáticos de consumo planificado y registros manuales, que descuentan inventario e imputan sus costos al lote.</p>
-          </div>
+        <details className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <summary className="cursor-pointer px-4 py-3 font-semibold">Movimientos de alimentación · {resumen.ultimosRegistros.length}</summary>
           {resumen.ultimosRegistros.length===0?<p className="p-5 text-sm text-slate-500">Aún no hay consumos registrados para este lote.</p>:
             <TableScroll><table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Fecha</th><th className="p-3">Tipo</th><th className="p-3">Detalle</th><th className="p-3 text-right">Costo</th></tr></thead>
@@ -342,22 +324,23 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
                 </tr>
               })}</tbody>
             </table></TableScroll>}
-        </section>
+        </details>
       </div>}
-      {lote&&eventosLote.length>0&&<section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="font-semibold">Bitácora de ejecución automática</h3>
+      {lote&&eventosLote.length>0&&<details className="rounded-xl border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer font-semibold">Ejecuciones automáticas · {eventosLote.length}</summary>
         <div className="mt-3 max-h-48 space-y-2 overflow-auto">{eventosLote.slice(0,15).map(e=><div key={e.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs">
           <span>{fecha(e.fecha)} · {e.animales} animales</span>
           <span className={e.estado==='APLICADO'?'text-emerald-800':'text-amber-800'}>{e.estado==='APLICADO'?'Inventario descontado':e.estado==='ERROR'?'Pendiente: '+e.detalle:'Registro manual previo'}</span>
         </div>)}</div>
-      </section>}
+      </details>}
       </>}
       {vista==='planes'&&<PlanCatalog planes={planes} detalles={detalles} asignaciones={asignaciones} lotes={lotes}
         productos={productos} unidades={unidades} esAdmin={esAdmin} busy={busy}
         onAssign={(loteId,planId)=>solicitarCambio(loteId,planId)}
+        onUnassign={solicitarDesasignar}
         onManage={solicitarGestionPlan}
         onModeChange={async(planId,modo)=>{if(!supabase)return;setBusy(true);setError('');try{const result=await supabase.rpc('sgic_configurar_modo_plan',{p_plan_id:planId,p_modo:modo});if(result.error)throw result.error;setAviso('Modalidad de cálculo actualizada.');await cargar()}catch(e){setError(e instanceof Error?e.message:'No se pudo modificar el plan')}finally{setBusy(false)}}}
-        onOpenLote={loteId=>{setSeleccion(String(loteId));onSelectLote?.(loteId);setNuevoPlan('');setVista('lotes')}}/>}
+        onOpenLote={loteId=>{setSeleccion(String(loteId));onSelectLote?.(loteId);setVista('lotes')}}/>}
     </>}
     <OperationConfirmDialog details={confirmacion?.details??null} onCancel={()=>setConfirmacion(null)} onConfirm={()=>void ejecutar()} busy={busy}/>
   </section>

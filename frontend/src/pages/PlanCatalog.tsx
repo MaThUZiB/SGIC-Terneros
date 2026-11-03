@@ -94,7 +94,7 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
                 <option key={l.id} value={l.id}>{l.codigo} · {l.cantidad_actual} animales{ocupados.has(l.id)?' · Reemplazar plan':''}</option>
               )}
             </select>
-            <button type="button" disabled={!destino||!componentes.length||busy} onClick={()=>onAssign(Number(destino),actual.id)} className="shrink-0 rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Asignar</button>
+            <button type="button" disabled={!destino||!componentes.length||busy} onClick={()=>{onAssign(Number(destino),actual.id);setDestino('')}} className="shrink-0 rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Asignar</button>
           </div>
         </section>}
         <section><h4 className="text-sm font-semibold">Historial de asignaciones ({asignacionesPlan.length})</h4>

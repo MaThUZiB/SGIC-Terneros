@@ -307,7 +307,7 @@ export function CloudWorkspacePage() {
                   <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2>
                     {tab==='animales'
                       ? <p className="mt-1 text-sm text-slate-600">Cantidad total: <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)} animales</strong></p>
-                      : <p className="mt-1 text-xs text-slate-500">{datos.productos.length} productos</p>
+                      : <p className="mt-1 text-xs text-slate-500">{datos.productos.length} productos</p>}
                   </div>
                   <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />

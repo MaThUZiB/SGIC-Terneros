@@ -164,10 +164,11 @@ export function SipecIntakeForm({animales,onCancel,onSuccess}:{
     finally{setBusy(false)}
   }
 
-  return <section className="space-y-5 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 sm:p-6">
+  return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-2">
-      <div><h3 className="text-lg font-semibold text-slate-900">Incorporar animales seleccionados</h3>
-        <p className="mt-1 text-sm text-slate-600">Completa lote, fecha, raza y valor de cada animal. Después pulsa «Paso 3: revisar y guardar animales» y confirma el resumen.</p></div>
+      <div><h3 className="text-base font-semibold text-slate-900">Incorporar {selected.length} animales</h3>
+        <details className="mt-1 text-xs text-slate-600"><summary className="cursor-pointer">Ayuda</summary>
+          <p className="mt-1">Completa lote, fecha, raza y valor. Revisa el resumen antes de guardar.</p></details></div>
       <button type="button" onClick={onCancel} disabled={busy} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60">Volver a comparación</button>
     </div>
     {loading&&<p role="status" className="text-sm text-slate-600">Cargando lotes, razas y proveedores…</p>}

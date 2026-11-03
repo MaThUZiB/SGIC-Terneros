@@ -50,15 +50,15 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
     return found?.diio??found?.nombre??found?.codigo??'#'+asText(value)
   }
   return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-      <h2 className="font-semibold text-slate-900">{config[module].title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{config[module].description}</p>
-    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+       <h2 className="text-sm font-semibold text-slate-900">{config[module].title}</h2>
+       {!loading&&!error&&<span className="text-xs text-slate-500">{rows.length} recientes</span>}
+     </div>
     {loading&&<p className="px-6 py-8 text-sm text-slate-500">Cargando registros…</p>}
     {error&&<p role="alert" className="px-6 py-5 text-sm text-red-700">{error}</p>}
     {!loading&&!error&&rows.length===0&&<p className="px-6 py-8 text-sm text-slate-500">No hay registros en este módulo.</p>}
     {!loading&&!error&&rows.length>0&&<div className="divide-y divide-slate-100">
-      {rows.map(item=><div key={String(item.id)} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50 sm:px-6">
+      {rows.map(item=><div key={String(item.id)} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
         {module==='ventas'&&<>
           <div><p className="font-semibold text-slate-900">Venta #{asText(item.id)} · {asText(item.comprador||'Sin comprador')}</p>
             <p className="mt-1 text-xs text-slate-500">{asText(item.fecha)} · Estado: <span className={item.estado==='CONFIRMADA'?'text-emerald-700':item.estado==='BORRADOR'?'text-amber-800':'text-slate-600'}>{item.estado==='BORRADOR'?'Pendiente':asText(item.estado)}</span></p></div>

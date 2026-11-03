@@ -116,22 +116,21 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
     setFilter('existentes')
   }
 
-  return <section aria-label="Sincronizar con SIPECweb" className="operation-panel operation-panel-wide space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+  return <section aria-label="Sincronizar con SIPECweb" className="operation-panel operation-panel-wide space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
       <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Animales · Conciliación con SAG</p>
-        <h2 className="mt-2 text-xl font-semibold">Sincronizar con SIPECweb</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Carga el archivo Excel XML (.xls) generado por «Consulta de animales» de SIPECweb.
-          Revisa los DIIO, completa sus valores y confirma para guardar los animales en SGIC.
-        </p>
+        
+        <h2 className="text-lg font-semibold">Importar SIPECweb</h2>
+        <details className="mt-2 text-xs text-slate-600"><summary className="cursor-pointer">Cómo importar</summary>
+          <p className="mt-2">Exporta «Consulta de animales» desde SIPECweb en formato .xls (Excel XML). Revisa los DIIO, completa sus valores y confirma.</p>
+        </details>
       </div>
       <CloseButton onClick={onClose} disabled={busy||incorporando} label="Cerrar sincronización"/>
     </div>
 
-    <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
-      <strong>{success ? 'Incorporación guardada.' : incorporando ? 'Paso 2 de 3 · Completar datos y valores.' : report ? 'Paso 1 de 3 · Archivo revisado.' : 'Paso 1 de 3 · Cargar archivo SIPECweb.'}</strong>{' '}
-      {success ? 'Puedes consultar los animales registrados o continuar con los insumos del predio.' : 'Los animales se guardan al completar el paso 3: revisar el resumen y confirmar el ingreso. Cargar el archivo o escribir precios todavía no guarda cambios.'}
+    <div role="status" className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700">
+      <strong>{success?'Incorporación guardada':incorporando?'Paso 2 · Completar animales':report?'Archivo revisado':'Paso 1 · Cargar archivo'}</strong>
+      {!success&&<span className="ml-2 text-xs text-slate-500">No se guarda nada hasta confirmar el paso final.</span>}
     </div>
 
     <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
@@ -139,17 +138,14 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
       <input id={inputId} type="file" accept=".xls,.xml,application/vnd.ms-excel,application/xml,text/xml"
         onChange={event=>{void selectFile(event)}} disabled={busy||incorporando}
         className="block w-full max-w-lg text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-800 file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-emerald-900 disabled:opacity-50"/>
-      <p className="mt-3 text-xs leading-5 text-slate-500">
-        Acepta el .xls de SIPECweb (Excel XML 2003); no el PDF de «Imprimir animales presentes».
-        Conserva los ceros iniciales de cada DIIO. Límite: 8 MB.
-      </p>
+      <p className="mt-2 text-xs text-slate-500">Archivo .xls de SIPECweb · máximo 8 MB. No admite PDF.</p>
     </div>
 
     {busy&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">Leyendo exportación y comparando DIIO registrados…</p>}
     {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{error}</p>}
     {success&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <p role="status" className="text-sm font-semibold text-emerald-900">{success}</p>
-      <p className="text-sm text-slate-700">Continúa con los productos y sus unidades en Catálogos, registra las compras de insumos y luego los consumos en Alimentación.</p>
+      
       <div className="flex flex-wrap gap-2">
         {([{id:'animales',label:'Ver animales guardados'},{id:'inventario',label:'1. Ingresar insumos'},
           {id:'compras',label:'2. Registrar insumos'},{id:'planes',label:'3. Alimentación'}] as const).map(step=>
@@ -182,11 +178,11 @@ export function SipecSyncPreview({onClose,onChanged,onNavigate}:{onClose:()=>voi
       {incorporando&&<SipecIntakeForm animales={comparison.nuevos} onCancel={()=>setIncorporando(false)}
         onSuccess={id=>{void afterIncorporate(id)}}/>}
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-        <strong>Importante:</strong> este listado es una fotografía, no una constancia de traspaso.
-        La columna ESTABLECIMIENTO no identifica necesariamente el RUP de destino.
-        Los DIIO que no aparecen en el archivo pueden corresponder a filtros, ventas, traslados u otros cambios:
-        no se marcan automáticamente como bajas. La exportación no contiene precio ni folio FMA.
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950">
+        <strong>Archivo referencial:</strong> los DIIO ausentes no se darán de baja automáticamente.
+        <details className="mt-1"><summary className="cursor-pointer font-medium">Limitaciones de SIPECweb</summary>
+          <p className="mt-2 leading-5">El archivo no es constancia de traspaso. ESTABLECIMIENTO puede no coincidir con el RUP de destino. Ausencias pueden deberse a filtros, ventas o traslados; no incluye precios ni folios FMA.</p>
+        </details>
       </div>
 
       {report.problemas.length>0&&<div className="rounded-xl border border-orange-200 bg-orange-50 p-4">

@@ -37,10 +37,13 @@ const formatoDinero = (n: number) => new Intl.NumberFormat('es-CL', { style: 'cu
 const formatoCantidad = (n: number) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n)
 function Indicador({ nombre, valor, nota, onClick }: { nombre: string; valor: string; nota: string; onClick:()=>void }) {
   return (
-    <button type="button" onClick={onClick} className="group w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500">
-      <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">{nombre}</p>
-      <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{valor}</p>
-      <p className="mt-2 text-xs text-slate-500">{nota} <span className="font-semibold text-emerald-700 group-hover:underline">· Ver detalle →</span></p>
+    <button type="button" onClick={onClick} aria-label={nombre+': '+valor+'. '+nota}
+      className="group w-full rounded-xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-emerald-400 hover:bg-emerald-50/40 focus-visible:ring-2 focus-visible:ring-emerald-500">
+      <p className="text-xs font-medium text-slate-500">{nombre}</p>
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <p className="text-xl font-semibold tabular-nums tracking-tight text-slate-900">{valor}</p>
+        <span className="text-sm text-emerald-700 opacity-60 group-hover:opacity-100" aria-hidden="true">↗</span>
+      </div>
     </button>
   )
 }
@@ -181,8 +184,7 @@ export function CloudWorkspacePage() {
                 <svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
               </button>
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">SGIC · Gestión integral</div>
-                <h1 className="truncate text-xl font-semibold tracking-tight text-slate-900">{moduleTitles[tab]}</h1>
+                <h1 className="truncate text-lg font-semibold tracking-tight text-slate-900">{moduleTitles[tab]}</h1>
               </div>
             </div>
             <div className="flex w-full shrink-0 items-center justify-end gap-3 sm:w-auto sm:gap-5">
@@ -196,14 +198,8 @@ export function CloudWorkspacePage() {
             </div>
           </div>
         </header>
-        <main className="app-main mx-auto w-full min-w-0 max-w-[1440px] flex-1 space-y-4 px-3 py-4 sm:px-7 lg:px-9 lg:py-8">
-          {tab==='resumen'&&<section className="rounded-3xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-7 text-white shadow-lg sm:px-9">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Centro de operaciones</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Control ganadero</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
-              Accede a la gestión del ganado, inventario, producción y finanzas desde el menú lateral.
-            </p>
-          </section>}
+        <main className="app-main mx-auto w-full min-w-0 max-w-[1440px] flex-1 space-y-4 px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
+
           {demo&&<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-950">
             <strong>Entorno de demostración.</strong> Los registros DEMO son ficticios y no corresponden a operaciones empresariales reales.
           </div>}
@@ -214,21 +210,25 @@ export function CloudWorkspacePage() {
         {!error && datos && (
           <>
             {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
-              {tab!=='catalogos'&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">Acciones de {moduleTitles[tab]}</h2>
-                  <p className="mt-1 text-xs text-slate-500">Selecciona una acción para abrir su formulario aquí.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {visibleActions.map(item=><button type="button" key={item.id}
-                    onClick={()=>{operation===item.id?closeOperation():openOperation(item.id)}}
-                    aria-expanded={operation===item.id}
-                    className={`rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${operation===item.id
-                      ?'border-emerald-800 bg-emerald-800 text-white'
-                      :'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-500 hover:bg-emerald-100'}`}>
-                    {item.label}
-                  </button>)}
-                </div>
+              {tab!=='catalogos'&&tab!=='planes'&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3">
+                {visibleActions.slice(0,2).map((item,index)=><button type="button" key={item.id}
+                  onClick={()=>{operation===item.id?closeOperation():openOperation(item.id)}}
+                  aria-expanded={operation===item.id}
+                  className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition ${operation===item.id
+                    ?'border-emerald-900 bg-emerald-900 text-white'
+                    :index===0?'border-emerald-900 bg-emerald-900 text-white hover:bg-emerald-800'
+                    :'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+                  {item.label}
+                </button>)}
+                {visibleActions.length>2&&<details className="min-w-0 max-w-full" open={visibleActions.slice(2).some(item=>item.id===operation)}>
+                  <summary className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Más acciones ({visibleActions.length-2})</summary>
+                  <div className="mt-2 flex max-w-full flex-wrap gap-2 rounded-lg bg-slate-50 p-2">
+                    {visibleActions.slice(2).map(item=><button type="button" key={item.id}
+                      aria-expanded={operation===item.id}
+                      onClick={()=>{operation===item.id?closeOperation():openOperation(item.id)}}
+                      className={`rounded-lg border px-3 py-2 text-sm ${operation===item.id?'border-emerald-800 bg-emerald-900 text-white':'border-slate-200 bg-white text-slate-700 hover:border-emerald-500'}`}>{item.label}</button>)}
+                  </div>
+                </details>}
               </div>}
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
                 <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
@@ -244,37 +244,36 @@ export function CloudWorkspacePage() {
             {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId} />}
+            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId}
+               onCreatePlan={()=>openOperation('catalogo')} onAddFood={()=>openOperation('planDetalle')} onViewTracking={closeOperation} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (
-              <div className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                   <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
                   <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
                   <Indicador nombre="Valor base del ganado activo" valor={formatoDinero(adquisiciones)} nota="Adquisición de animales activos" onClick={()=>abrirModulo("compras")} />
                   <Indicador nombre="Bajas por fallecimiento" valor={formatoDinero(bajas)} nota="Valor de adquisición · separado del ganado activo" onClick={()=>abrirModulo("animales","FALLECIDO")} />
                   <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
                 </div>
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="font-semibold">Estado de lotes</h2>
-                    <div className="mt-5 space-y-3">
-                      {datos.lotes.map(l => (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <section className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Lotes</h2><button type="button" onClick={()=>abrirModulo('lotes')} className="text-xs font-medium text-emerald-800 hover:underline">Ver todos</button></div>
+                    <div className="mt-3 space-y-1.5">
+                      {datos.lotes.slice(0,6).map(l => (
                         <button type="button" onClick={()=>abrirModulo("lotes")} key={l.id} className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-left text-sm hover:bg-emerald-50">
-                          <div><div className="font-semibold">{l.codigo}</div><div className="mt-1 text-xs text-slate-500">{formatoCantidad(l.cantidad_actual)} animales</div></div>
+                          <div className="min-w-0"><span className="font-medium">{l.codigo}</span><span className="ml-2 text-xs text-slate-500">{formatoCantidad(l.cantidad_actual)} animales</span></div>
                           <Estado valor={l.estado} />
                         </button>
                       ))}
-                      {datos.lotes.length === 0 && <TablaVacia texto="No existen lotes registrados." />}
+                      {datos.lotes.length>6&&<p className="px-3 py-2 text-xs text-slate-500">+{datos.lotes.length-6} lotes más</p>}
+                       {datos.lotes.length === 0 && <TablaVacia texto="Sin lotes registrados." />}
                     </div>
                   </section>
-                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="font-semibold">Inventario y alertas</h2>
-                    <p className="mt-3 text-sm text-slate-600">
-                      {faltantes} de {datos.productos.length} productos están en o bajo el mínimo definido.
-                    </p>
-                    <div className="mt-5 space-y-3">
+                  <section className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Stock bajo <span className="ml-1 text-xs font-normal text-slate-500">({faltantes})</span></h2><button type="button" onClick={()=>abrirModulo('inventario')} className="text-xs font-medium text-emerald-800 hover:underline">Inventario</button></div>
+                    <div className="mt-3 space-y-1.5">
                       {datos.productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).slice(0,5).map(p => (
                         <button key={p.id} type="button" onClick={()=>abrirModulo("inventario")} className="flex w-full items-center justify-between rounded-xl bg-amber-50 px-4 py-3 text-left text-sm text-amber-950 hover:bg-amber-100">
                           <span className="font-medium">{p.nombre}</span><span>{formatoCantidad(p.stock_actual)} disponibles</span>
@@ -288,16 +287,14 @@ export function CloudWorkspacePage() {
             )}
 
             {tab==='lotes' && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold">Registro de lotes</h2>
-              <p className="mb-5 mt-1 text-sm text-slate-500">Existencias y estado de cada agrupación ganadera.</p>
+              <h2 className="mb-3 text-base font-semibold">Lotes <span className="text-sm font-normal text-slate-500">({datos.lotes.length})</span></h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {datos.lotes.map(l=><article key={l.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                   <div className="flex justify-between gap-3"><strong>{l.codigo}</strong><Estado valor={l.estado}/></div>
-                  <p className="mt-4 text-2xl font-semibold">{formatoCantidad(l.cantidad_actual)}</p>
-                  <p className="text-sm text-slate-500">animales registrados actualmente</p>
+                  <p className="mt-2 text-xl font-semibold tabular-nums">{formatoCantidad(l.cantidad_actual)} <span className="text-xs font-normal text-slate-500">animales</span></p>
                   <button type="button" onClick={()=>abrirModulo('animales','TODOS',l.codigo)}
-                    className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales del lote →</button>
-                  <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline">Seguimiento alimentario →</button>
+                    className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales →</button>
+                  <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline">Seguimiento →</button>
                 </article>)}
                 {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
               </div>
@@ -311,7 +308,7 @@ export function CloudWorkspacePage() {
                   <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2>
                     {tab==='animales'
                       ? <p className="mt-1 text-sm text-slate-600">Cantidad total: <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)} animales</strong></p>
-                      : <p className="mt-1 text-xs text-slate-500">Cantidades en unidad base y equivalencias comerciales (no un conteo de envases sellados).</p>}
+                      : <p className="mt-1 text-xs text-slate-500">{datos.productos.length} productos</p>}
                   </div>
                   <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
@@ -323,7 +320,7 @@ export function CloudWorkspacePage() {
                   </button>)}
                 </div>}
                 {tab==='animales'&&<div className="border-b border-slate-100 px-5 py-2.5 text-xs text-slate-600" role="status">
-                  Mostrando <strong className="tabular-nums text-slate-900">{formatoCantidad(listaAnimales.length)}</strong> de <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)}</strong> animales registrados{filtroAnimal!=='TODOS'||buscar.trim()?' (según filtros y búsqueda)':''}.
+                  {formatoCantidad(listaAnimales.length)} resultados · {formatoCantidad(totalAnimales)} animales registrados
                 </div>}
                 <TableScroll>
                   {tab === 'animales' ? (

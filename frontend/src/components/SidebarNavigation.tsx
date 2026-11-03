@@ -82,23 +82,22 @@ export function SidebarNavigation({
 
   function body(){
     return <>
-      <div className="flex items-center gap-3 border-b border-slate-800 px-5 py-6">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-500 font-bold text-slate-950">SG</span>
-        <div><div className="text-base font-bold tracking-tight text-white">SGIC-Terneros</div>
-          <div className="mt-0.5 text-xs text-slate-400">Gestión ganadera</div></div>
+      <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-4">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-500 text-sm font-bold text-slate-950">SG</span>
+        <div className="text-sm font-bold tracking-tight text-white">SGIC Terneros</div>
         <button type="button" onClick={onClose} aria-label="Cerrar menú" className="ml-auto rounded-lg p-2 text-slate-300 hover:bg-slate-800 lg:hidden">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l14 14M19 5 5 19"/></svg>
         </button>
       </div>
-      <nav aria-label="Módulos del sistema" className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5">
+      <nav aria-label="Módulos del sistema" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4">
         {navigationGroups.map(group=>{
           const visible=group.entries.filter(entry=>esAdmin||!entry.adminOnly)
           if(!visible.length)return null
           return <div key={group.label}>
-            <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">{group.label}</p>
+            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</p>
             <div className="space-y-0.5">{visible.map(entry=><button type="button" key={entry.id}
               onClick={()=>{onNavigate(entry.id);onClose()}} aria-current={current===entry.id?'page':undefined}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${current===entry.id
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${current===entry.id
                 ?'bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/40'
                 :'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
               <SidebarIcon name={entry.icon}/><span>{entry.title}</span>
@@ -107,7 +106,6 @@ export function SidebarNavigation({
           </div>
         })}
       </nav>
-      <div className="border-t border-slate-800 px-5 py-4 text-xs text-slate-400">Panel de administración · Supabase</div>
     </>
   }
 

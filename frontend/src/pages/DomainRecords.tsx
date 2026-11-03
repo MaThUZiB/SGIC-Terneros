@@ -58,7 +58,7 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
     {error&&<p role="alert" className="px-6 py-5 text-sm text-red-700">{error}</p>}
     {!loading&&!error&&rows.length===0&&<p className="px-6 py-8 text-sm text-slate-500">No hay registros en este módulo.</p>}
     {!loading&&!error&&rows.length>0&&<div className="divide-y divide-slate-100">
-      {rows.map(item=><div key={String(item.id)} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50 sm:px-6">
+      {rows.map(item=><div key={String(item.id)} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
         {module==='ventas'&&<>
           <div><p className="font-semibold text-slate-900">Venta #{asText(item.id)} · {asText(item.comprador||'Sin comprador')}</p>
             <p className="mt-1 text-xs text-slate-500">{asText(item.fecha)} · Estado: <span className={item.estado==='CONFIRMADA'?'text-emerald-700':item.estado==='BORRADOR'?'text-amber-800':'text-slate-600'}>{item.estado==='BORRADOR'?'Pendiente':asText(item.estado)}</span></p></div>

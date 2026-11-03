@@ -145,7 +145,14 @@ export function CloudWorkspacePage() {
   const adquisiciones = (datos?.animales ?? []).filter(a=>a.estado==='ACTIVO').reduce((s, a) => s + Number(a.precio_adquisicion), 0)
   const valorStock = (datos?.productos ?? []).reduce((s, p) => s + Number(p.stock_actual) * Number(p.costo_promedio), 0)
   const demo = (datos?.animales ?? []).some(a => a.diio.startsWith('DEMO-'))
+  const totalAnimales = datos?.animales.length ?? 0
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
+  const animalesFallecidos = (datos?.animales ?? []).filter(a => a.estado === 'FALLECIDO').length
+  const animalesVendidos = (datos?.animales ?? []).filter(a => a.estado === 'VENDIDO').length
+  const totalPorEstado:Record<string,number> = {
+    TODOS:totalAnimales, ACTIVO:animalesActivos,
+    FALLECIDO:animalesFallecidos, VENDIDO:animalesVendidos,
+  }
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
 
   const availableActions=getModuleActions(tab,esAdmin)
@@ -301,15 +308,22 @@ export function CloudWorkspacePage() {
             {(tab === 'animales' || tab === 'inventario') && (
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2><p className="mt-1 text-xs text-slate-500">{tab === 'inventario' ? 'Cantidades en unidad base y equivalencias comerciales (no un conteo de envases sellados).' : 'Consultar registros y movimientos'}</p></div>
+                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2>
+                    {tab==='animales'
+                      ? <p className="mt-1 text-sm text-slate-600">Cantidad total: <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)} animales</strong></p>
+                      : <p className="mt-1 text-xs text-slate-500">Cantidades en unidad base y equivalencias comerciales (no un conteo de envases sellados).</p>}
+                  </div>
                   <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
                 </div>
                 {tab==='animales'&&<div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3" aria-label="Filtrar animales por estado">
                   {(['TODOS','ACTIVO','FALLECIDO','VENDIDO'] as const).map(state=><button key={state} type="button" onClick={()=>setFiltroAnimal(state)}
                     className={`rounded-full border px-3.5 py-2 text-xs font-semibold ${filtroAnimal===state?'border-emerald-900 bg-emerald-900 text-white':'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
-                    {state==='TODOS'?'Todos':state==='ACTIVO'?'Activos':state==='FALLECIDO'?'Fallecidos':'Vendidos'}
+                    {state==='TODOS'?'Todos':state==='ACTIVO'?'Activos':state==='FALLECIDO'?'Fallecidos':'Vendidos'} ({formatoCantidad(totalPorEstado[state])})
                   </button>)}
+                </div>}
+                {tab==='animales'&&<div className="border-b border-slate-100 px-5 py-2.5 text-xs text-slate-600" role="status">
+                  Mostrando <strong className="tabular-nums text-slate-900">{formatoCantidad(listaAnimales.length)}</strong> de <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)}</strong> animales registrados{filtroAnimal!=='TODOS'||buscar.trim()?' (según filtros y búsqueda)':''}.
                 </div>}
                 <TableScroll>
                   {tab === 'animales' ? (

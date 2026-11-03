@@ -94,8 +94,10 @@ export function SaleIndividualPrices({onClose,onChanged}:{
   }
   return <section aria-label="Venta con precios individuales" className="operation-panel operation-panel-wide space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-xl font-semibold">Venta con precios por DIIO</h2>
-        <p className="mt-1 text-sm text-slate-600">Selecciona animales activos y asigna un precio de venta a cada uno. Puedes escribir 180000 o 180.000 CLP.</p></div>
+      <div><h2 className="text-lg font-semibold">Venta por DIIO</h2>
+         <details className="mt-2 text-xs text-slate-600"><summary className="cursor-pointer">Ayuda</summary>
+           <p className="mt-1">Selecciona animales activos y define el precio de cada uno. Escribe 180000 o 180.000 CLP.</p>
+         </details></div>
       <CloseButton onClick={onClose} disabled={busy} label="Cerrar formulario"/>
     </div>
     {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}

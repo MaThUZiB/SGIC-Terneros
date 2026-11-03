@@ -41,7 +41,7 @@ export function DomainRecords({module,revision}:{module:RecordModule;revision:nu
           if(!values.length)return []
           const result=await supabase!.from(table).select(columns).in('id',values)
           if(result.error)throw new Error(result.error.message)
-          return (result.data??[]) as Named[]
+          return (result.data??[]) as unknown as Named[]
         }
         const [animals,products,lotes]=await Promise.all([
           getNames('animal','id,diio',ids('animal_id')),

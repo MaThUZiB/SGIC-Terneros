@@ -53,7 +53,7 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
     async function loadCounts(){
       if(type!=='animales'||!supabase)return
       const results=await Promise.all(states.map(async state=>{
-        let q=supabase.from('sgic_animales_busqueda').select('id',{head:true,count:'exact'})
+        let q=db.from('sgic_animales_busqueda').select('id',{head:true,count:'exact'})
         if(state!=='TODOS')q=q.eq('estado',state)
         return q
       }))

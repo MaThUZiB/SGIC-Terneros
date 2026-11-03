@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { MOBILE_PRIMARY_MODULES, isMobileMoreModule } from '../utils/mobileNavigation'
 
 export type ModuleId =
   | 'resumen' | 'animales' | 'lotes' | 'inventario' | 'compras' | 'planes'
@@ -69,8 +70,8 @@ export function SidebarNavigation({
 }){
   const sheetRef=useRef<HTMLElement>(null)
   const moreRef=useRef<HTMLButtonElement>(null)
-  const directos:ModuleId[]=['resumen','animales','inventario']
-  const currentIsMore=!directos.includes(current)
+  const directos:ModuleId[]=[...MOBILE_PRIMARY_MODULES]
+  const currentIsMore=isMobileMoreModule(current)
   useEffect(()=>{
     if(!open)return
     sheetRef.current?.querySelector<HTMLButtonElement>('[data-menu-close]')?.focus()
@@ -82,6 +83,7 @@ export function SidebarNavigation({
       const elements=Array.from(sheetRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'))
       if(!elements.length)return
       const first=elements[0],last=elements[elements.length-1]
+      if(!sheetRef.current.contains(document.activeElement)){event.preventDefault();first.focus();return}
       if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
     }

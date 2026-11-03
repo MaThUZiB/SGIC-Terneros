@@ -455,12 +455,32 @@ export function OperationsHistory({esAdmin}:{esAdmin:boolean}){
       {loading&&<p role="status" className="p-4 text-sm text-slate-500">Cargando registros…</p>}
       {failure&&<p className="p-5 text-sm text-red-700">{failure}</p>}
       {!loading&&!failure&&!data.length&&<p className="p-5 text-sm text-slate-500">Sin registros</p>}
-      {!loading&&!failure&&data.length>0&&<TableScroll><table className="min-w-full text-left text-sm">
+      {!loading&&!failure&&data.length>0&&<>
+        <div className="divide-y divide-slate-100 md:hidden">
+          {data.map((record,i)=><article key={String(record.id||i)} className="px-4 py-3">
+            <h3 className="text-sm font-semibold">Registro #{String(record.id??'—')}</h3>
+            <p className="mt-1 text-xs text-slate-600">
+              {views[view][0]?.replaceAll('_',' ')}: {String(record[views[view][0]]??'—')}
+            </p>
+            <details className="mt-2 text-xs text-slate-600"><summary className="cursor-pointer py-1">Ver campos</summary>
+              <dl className="mt-2 grid grid-cols-2 gap-2">
+                {views[view].map(field=><div key={field} className="min-w-0 break-words">
+                  <dt className="text-slate-500">{field.replaceAll('_',' ')}</dt>
+                  <dd className="mt-1 font-medium">{String(record[field]??'—')}</dd>
+                </div>)}
+              </dl>
+            </details>
+          </article>)}
+        </div>
+        <div className="hidden md:block">
+          <TableScroll><table className="min-w-full text-left text-sm">
         <thead><tr>{['id',...views[view]].map(f=><th key={f} className="whitespace-nowrap p-3 text-xs uppercase text-slate-500">{f.replaceAll('_',' ')}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{data.map((r,i)=><tr key={String(r.id||i)}>
           {['id',...views[view]].map(f=><td key={f} className="whitespace-nowrap p-3">{r[f]===null?'—':String(r[f]??'')}</td>)}
         </tr>)}</tbody>
-      </table></TableScroll>}
+          </table></TableScroll>
+        </div>
+      </>}
       {!loading&&!failure&&<Pagination page={page} total={total} onChange={setPage} label={view.replaceAll('_',' ')}/>}
     </div>
   </section>

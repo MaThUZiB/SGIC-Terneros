@@ -69,8 +69,33 @@ export function ProfitabilityReport({bajasPorLote={}}:{bajasPorLote?:Record<numb
       {desglose?'Vista simple':'Ver desglose completo'}
      </button>
     </div>
-    {!rows.length?<p className="p-5 text-sm text-slate-500">Sin lotes registrados.</p>:
-    <TableScroll><table className="min-w-full text-left text-sm">
+    {!rows.length?<p className="p-5 text-sm text-slate-500">Sin lotes registrados.</p>:<>
+     <div className="divide-y divide-slate-100 md:hidden">
+      {rows.map(r=><article key={r.lote_id} className="space-y-3 px-4 py-4">
+       <div className="flex items-center justify-between gap-3">
+        <h4 className="font-semibold">{r.codigo}</h4>
+        <span className="text-xs text-slate-600">{r.cantidad_actual} animales</span>
+       </div>
+       <dl className="grid grid-cols-2 gap-3 text-sm">
+        <div><dt className="text-xs text-slate-500">Costo acumulado</dt>
+         <dd className="mt-1 font-medium tabular-nums">{format(Number(r.adquisicion)+Number(r.alimentacion)+Number(r.sanidad)+Number(r.gastos_imputables))}</dd></div>
+        <div><dt className="text-xs text-slate-500">Ventas</dt><dd className="mt-1 font-medium tabular-nums">{format(r.ingresos_venta)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-slate-500">Utilidad realizada</dt>
+         <dd className="mt-1 text-lg font-semibold tabular-nums">{format(r.utilidad_ventas)}</dd></div>
+       </dl>
+       {desglose&&<dl className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
+        {([
+          ['Adquisición',r.adquisicion],['Bajas incluidas',bajasPorLote[r.lote_id]??0],
+          ['Alimentación',r.alimentacion],['Sanidad',r.sanidad],
+          ['Otros gastos',r.gastos_imputables],['Costo reconocido',r.costo_reconocido],
+        ] as [string,number][]).map(([label,value])=><div key={label}>
+          <dt className="text-slate-500">{label}</dt><dd className="font-medium tabular-nums">{format(value)}</dd>
+        </div>)}
+       </dl>}
+      </article>)}
+     </div>
+     <div className="hidden md:block">
+      <TableScroll><table className="min-w-full text-left text-sm">
      <thead><tr>
       <th className="whitespace-nowrap p-3 text-xs text-slate-500">Lote</th>
       <th className="whitespace-nowrap p-3 text-xs text-slate-500">Animales</th>
@@ -94,7 +119,9 @@ export function ProfitabilityReport({bajasPorLote={}}:{bajasPorLote?:Record<numb
       {desglose&&<td className="whitespace-nowrap p-3">{format(r.costo_reconocido)}</td>}
       <td className="whitespace-nowrap p-3 font-semibold">{format(r.utilidad_ventas)}</td>
      </tr>)}</tbody>
-    </table></TableScroll>}
+      </table></TableScroll>
+     </div>
+    </>}
    </section>
   </>}
  </div>

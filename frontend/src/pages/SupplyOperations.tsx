@@ -9,7 +9,7 @@ import { calcularRacionDiaria, sugerenciaPorAnimal, type ModoRacion } from '../u
 type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_actual?:number; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
 type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
-export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','consumoPlan','tratamiento','consumo']
+export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','tratamiento','consumo']
 const titles:Record<string,string>={ingresoInsumo:'Ingresar insumos',usoInsumo:'Registrar uso',perdidaInsumo:'Registrar pérdida',configInsumo:'Uso en planes',consumoPlan:'Confirmar alimentación del día',tratamiento:'Registrar tratamiento',consumo:'Registrar alimentación real'}
 const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'})
 const money=(n:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:2}).format(n)

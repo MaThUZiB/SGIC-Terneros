@@ -54,3 +54,15 @@ test('consumo fuera de plan se suma al total pero no a la ejecución planificada
   assert.equal(report.productos[0].realDurantePlan,0)
   assert.equal(report.diasSinPlanConConsumo,1)
 })
+
+test('modo por ternero escala el plan según censo y reconoce cargo automático',()=>{
+  const assign={...base,modo_racion:'ANIMAL',fecha_inicio:'2026-11-01',componentes:[{id:2,producto_id:5,cantidad_diaria:0.125,unidad_id:1}]}
+  const consumos=[{id:20,lote_id:1,fecha:'2026-11-01',origen:'PLAN',observaciones:'AUTO_PLAN_ASIGNACION:10|ANIMALES:20|MODO:ANIMAL'}]
+  const detalles=[{id:20,consumo_id:20,producto_id:5,cantidad:2.5,costo_total:500}]
+  const eventos=[{id:1,lote_id:1,asignacion_id:10,fecha:'2026-11-01',estado:'APLICADO',animales:20,detalle:null}]
+  const r=calcularSeguimientoLote(1,[assign],consumos,detalles,'2026-11-02',eventos,18)
+  assert.equal(r.diasConfirmadosPlan,1)
+  assert.equal(r.diasProgramados,2)
+  assert.equal(r.productos[0].planificado,4.75)
+  assert.equal(r.productos[0].realTotal,2.5)
+})

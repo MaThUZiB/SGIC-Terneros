@@ -1,70 +1,47 @@
-# Seguimiento alimentario por lote
+# Alimentación automática por lote — SGIC Terneros
 
-## Flujo de trabajo
+## Flujo diario sin confirmaciones
 
-1. En **Alimentación → Gestión de planes**, consulta el catálogo de planes activos y archivados, su composición diaria, número de lotes asignados e historial. Crea planes con **Crear nuevo registro** y agrega sus ingredientes con **Agregar producto a plan**. La cantidad del plan maestro corresponde **al lote completo**.
-2. Desde **Gestión de planes**, abre un plan y elige **Asignar** para vincularlo con un lote activo; también puedes cambiar o desasignar el plan desde **Seguimiento por lote**. La asignación no altera el inventario.
-3. Cada día, usa **Confirmar alimentación del día**. Por defecto, el formulario recibe la cantidad total diaria congelada para el lote. Opcionalmente selecciona **Por ternero** e ingresa la ración individual de cada insumo; el sistema multiplica por los animales actualmente registrados, redondea la cantidad total a tres decimales y permite editarla antes de confirmar. Registra cero para omitir un insumo. El formulario muestra costo estimado y alerta si el stock no alcanza. Solo al confirmar se descuentan existencias y se imputa el costo real.
-4. En **Seguimiento por lote** consulta el consumo total y durante la vigencia del plan, los días registrados o sin registro, el costo acumulado y los movimientos recientes.
-5. Si cambias la dieta, selecciona otro plan y pulsa **Cambiar plan**; si suspendes la planificación, pulsa **Desasignar**. Ambas acciones conservan asignaciones y consumos anteriores.
+1. En **Alimentación → Gestión de planes** crea el plan maestro.
+2. Los planes **nuevos** calculan por defecto la ración **por ternero y día**. Antes de asignarlo se puede cambiar a una cantidad fija **por lote**. Los planes anteriores mantienen la interpretación histórica «total del lote».
+3. Añade alimentos desde **Añadir alimento al plan**, expresando sus cantidades en la **unidad base del inventario** (kg, l, etc.). Para un plan por ternero, la cantidad representa lo previsto por animal por día.
+4. Asigna el plan a uno o varios lotes activos. Desde esa fecha, **no se necesita confirmar cada jornada**.
+5. SGIC ejecuta automáticamente la salida de inventario al cierre de cada día, después de las **23:00 hora de Chile**, mediante un proceso programado en Supabase. La tarea revisa también los últimos siete días para reintentar fallos de stock o interrupciones.
+6. **Seguimiento por lote** permite ver los cargos, costos, fechas pendientes, historial de planes y errores. El plan puede cambiarse o desasignarse, sin borrar registros anteriores.
 
-También puedes abrir la ficha desde **Lotes → Seguimiento alimentario**.
+## Fórmulas
 
-## Cambio y desasignación
+- Plan por ternero: `consumo_programado_producto = redondear(gramos_o_kilos_diarios_por_ternero × animales_actuales, 3 decimales)`.
+- Plan fijo por lote: `consumo_programado_producto = cantidad_diaria_configurada`.
+- Costo imputado: cantidad descontada en unidad base × costo promedio ponderado vigente.
+- **No** conviertas litros de leche reconstituida en kg de sustituto sin una equivalencia configurada y validada. El proceso actual utiliza unidades base, no sacos comerciales ni litros preparados si el inventario lleva kilogramos de polvo.
 
-- Solo un usuario **ADMIN** activo puede cambiar o desasignar planes.
-- Los cambios se aplican en la **fecha actual de Chile**; no se editan fechas históricas ni se programan reemplazos futuros desde esta versión.
-- Si hoy ya se confirmó la alimentación del lote mediante un plan, no se permite asignar otro plan hasta mañana. Se puede desasignar el actual después de confirmar hoy, conservando ese consumo.
-- Una asignación terminada queda inactiva, con fecha de finalización y auditoría. **No se borra ni se revierte el inventario.**
-- Una asignación creada y sustituida el mismo día sin ejecutar queda marcada `SGIC_SIN_EJECUCION` y no se suma como un día planificado.
-- Cada asignación guarda una **instantánea de sus ingredientes y cantidades**. Añadir productos al plan maestro no altera la programación de lotes ya asignados. Las asignaciones anteriores a esta versión reciben la composición vigente al instalar la migración, porque sus versiones históricas no se habían guardado.
+## Seguridad de inventario y reintentos
 
-## Cómo leer los indicadores
+- El cargo se ejecuta en la base de datos, sin que el usuario tenga la aplicación abierta.
+- Hay una restricción única de consumo `PLAN` por lote y fecha. La tarea también usa un bloqueo transaccional: reintentar **no duplica salidas**.
+- Antes del cargo se valida el stock de **cada insumo sumando todas las líneas**. Si falta un producto o el plan es inválido, **todo el cargo del lote se revierte** y la jornada queda como **ERROR** en `sgic_alimentacion_auto_evento`.
+- Si se ingresa stock después, la tarea vuelve a intentar la fecha pendiente durante un máximo de siete días.
+- Si ya existe un registro manual `REAL` del lote y día, se evita el cargo automático de ese día por riesgo de duplicación, dejando estado `OMITIDO_MANUAL` para revisión.
+- Las acciones automáticas se registran con `usuario_id = NULL` (no se atribuyen falsamente a una persona). La observación del consumo contiene asignación, modo y censo usado. Los movimientos manuales mantienen su usuario.
+- La tarea no crea cargos para fechas anteriores al 3 de noviembre de 2026 y nunca procesa fechas futuras.
+- Los lotes cerrados no reciben cargos nuevos.
 
-- **Días con plan:** jornadas transcurridas durante las asignaciones de ese lote.
-- **Días registrados:** jornadas del plan con al menos un movimiento de alimentación `PLAN` o `REAL`.
-- **Días sin registro:** diferencia entre días programados y días registrados. No significa que los animales no hayan comido.
-- **Planificado por producto:** cantidad diaria congelada × jornadas aplicables.
-- **Registrado durante plan:** total registrado en fechas que tienen un plan activo, incluyendo entradas manuales.
-- **Total registrado y costo:** incluye también alimentación manual fuera de los intervalos del plan.
-- Un movimiento manual adicional del mismo producto y día **se suma al consumo registrado**: evita introducir dos veces el mismo alimento.
+## Precisión contable
 
-Los acumulados se calculan sobre las tablas `consumo` y `detalle_consumo`. El panel pagina la lectura del historial; si supera 10.000 filas por tabla, muestra una advertencia de que las cifras pueden ser parciales.
+Los movimientos automáticos son **consumo teórico o programado imputado al lote**. Son una provisión operativa para descontar stock y costear la alimentación, **no evidencia de ingesta real**. Si se entregó menos, hubo desperdicio o alimento sobrante, hay que realizar un ajuste identificado (y mantener ese historial). La tarea no puede inferir cambios de dieta, ayunos, sobrantes, pérdidas de leche preparada o alimentos suministrados parcialmente.
 
-## Consideraciones operativas
+En un día de reintento atrasado, el censo y costo promedio disponibles pueden ser posteriores a la fecha histórica. El sistema conserva el censo usado en la bitácora, pero conviene registrar las bajas/altas de animales oportunamente para reducir desfases. No backfill más de siete días sin una conciliación.
 
-- La programación diaria se define por **lote**, no por ternero. Si cambia la cantidad de animales, revisa manualmente las raciones antes de confirmar el consumo. El sistema indica cuando el conteo actual difiere del original.
-- Solo la confirmación real de alimentación o un consumo manual descuenta inventario. Asignar, cambiar y desasignar no genera salidas ni entradas.
-- La base de datos evita una segunda confirmación desde plan para el mismo lote y fecha, incluso después de un cambio de asignación.
-- No confundas cantidad entregada al lote con cantidad efectivamente ingerida por cada animal.
+## Implementación
 
-## Implementación técnica
+- Migración: `supabase/migrations/20261103094500_alimentacion_automatica_diaria.sql`.
+- Scheduler: `pg_cron`, trabajo `sgic-alimentacion-automatica`, cada hora al minuto 15 UTC. Un control de hora local aplica el cargo de hoy a partir de las 23:00 de Chile.
+- Funciones privadas: `sgic_private.ejecutar_alimentacion_programada()`, `sgic_private.aplicar_alimentacion_automatica(date)`.
+- Registro de alertas: `public.sgic_alimentacion_auto_evento` (RLS de solo lectura para perfiles activos).
+- UI: `frontend/src/pages/PlansOverview.tsx` y `PlanCatalog.tsx`. El botón de confirmación manual ya no se ofrece y se retiran los permisos de ejecución a las RPC manuales del plan.
+- Se conserva la composición y modalidad en cada asignación; cambiar un plan con historial obliga a crear otro para preservar su trazabilidad.
 
-- UI: `frontend/src/pages/PlansOverview.tsx`; ficha desde `CloudWorkspacePage.tsx`.
-- Cálculo: `frontend/src/utils/feedingTracking.ts`; pruebas `frontend/tests/feedingTracking.test.mjs`.
-- Confirmación: `SupplyOperations.tsx` utiliza `sgic_confirmar_alimentacion` y la instantánea `asignacion_plan_lote.componentes`.
-- Migraciones de Supabase:
-  - `20261023145858_seguimiento_y_cambio_planes_lotes.sql`
-  - `20261023150059_consumo_plan_unico_por_lote_dia.sql`
+## Ajustes futuros
 
-## Eliminar, archivar y reactivar un plan maestro
-
-En **Planes disponibles**, un administrador puede:
-
-- **Eliminar** un plan que nunca haya sido asignado: se borran el plan y sus líneas de composición; se pide confirmación explícita.
-- **Archivar** un plan sin asignaciones vigentes: deja de ofrecerse para nuevas asignaciones, pero conserva su historial de lotes y consumos. Si está vigente en algún lote, primero hay que cambiarlo o desasignarlo.
-- **Reactivar** un plan archivado: vuelve a estar disponible para futuras asignaciones sin alterar las anteriores.
-
-Estas operaciones están protegidas por la RPC `sgic_gestionar_plan`, que valida permisos ADMIN y ejecuta cambios atómicos y auditados.
-
-## Cálculo diario y límites del modelo vigente
-
-- **Total del lote** (por defecto): `cantidad_a_descontar = cantidad_diaria_configurada`. No hay multiplicación automática; esto mantiene los planes anteriores sin cambios de significado.
-- **Por ternero** (opción de registro diario): `cantidad_a_descontar = redondear_3(cantidad_por_ternero × animales_activos_actuales)`. Esta opción usa el censo actual, solo permite confirmar hoy y no modifica el plan maestro ni la instantánea de su asignación. La sugerencia inicial deriva de la cantidad total del plan / censo actual, por lo que editarla es necesario si cambia la ración individual.
-- La previsualización muestra cantidades por alimento, equivalencia aproximada por cabeza, stock insuficiente y costo calculado al costo promedio actual. Los datos pueden cambiar antes de confirmar, por lo que Supabase vuelve a validar existencias y fecha en la operación transaccional.
-- Las cantidades son **unidades base del inventario** (kg, l, etc.), no número de sacos ni volumen de leche reconstituida si el producto almacenado es sustituto en polvo.
-- No se registran automáticamente días sin confirmación. El registro manual y la confirmación del plan son movimientos separados: no vuelvas a registrar manualmente la misma entrega que ya confirmaste desde el plan.
-
-### Evolución recomendada del cálculo
-
-El próximo paso para un modelo duradero es permitir **planes maestros con tipo de dosis persistente** (`por animal` o `por lote`), congelar esa elección en cada asignación y guardar el censo utilizado en cada ejecución. Así, una reducción del lote mantendría la ración individual sin cambiar manualmente el plan maestro. Para sustitutos lácteos sería útil configurar una **equivalencia por producto** entre litros preparados y kg de polvo consumido, evitando contabilizar dos veces el mismo alimento. Requiere migración versionada y revisión de reportes históricos; estos cambios no se activan automáticamente con la interfaz actual.
+Valorar una conciliación diaria entre **alimento programado**, **alimento entregado** y **mermas/sobrantes** que no requiera confirmar la jornada normal, pero permita correcciones excepcionales sin duplicar consumo. Para leche, incorporar recetas verificadas de litros preparados a kg de polvo. También conviene capturar censos históricos y asignaciones futuras para recalcular reintentos de forma exacta.

@@ -3,8 +3,9 @@ export type ComponentePlan = { id:number; producto_id:number; cantidad_diaria:nu
 export type Asignacion = {
   id:number; lote_id:number; plan_id:number; fecha_inicio:string;
   fecha_fin:string|null; activo:boolean; observaciones?:string|null;
-  componentes:ComponentePlan[]
+  componentes:ComponentePlan[]; modo_racion?:'LOTE'|'ANIMAL'
 }
+export type EventoAutomatico = {id:number;lote_id:number;asignacion_id:number;fecha:string;estado:'APLICADO'|'ERROR'|'OMITIDO_MANUAL';animales:number;detalle:string|null}
 export type Consumo = {
   id:number; lote_id:number|null; fecha:string; origen:string;
   observaciones:string|null
@@ -38,11 +39,12 @@ export function asignacionEnFecha(a:Asignacion,fecha:string):boolean{
 }
 export function calcularSeguimientoLote(
   loteId:number, asignaciones:Asignacion[], consumos:Consumo[],
-  detalles:DetalleConsumo[], hoy:string
+  detalles:DetalleConsumo[], hoy:string, eventos:EventoAutomatico[]=[], animalesActuales=0
 ):SeguimientoLote {
   const delLote=asignaciones.filter(a=>a.lote_id===loteId)
     .sort((a,b)=>b.fecha_inicio.localeCompare(a.fecha_inicio)||b.id-a.id)
   const movimientos=consumos.filter(c=>c.lote_id===loteId && (c.origen==='PLAN'||c.origen==='REAL'))
+  const eventosPorFecha=new Map(eventos.filter(e=>e.lote_id===loteId).map(e=>[e.fecha,e]))
   const fechas=new Map<string,Consumo[]>()
   for(const c of movimientos){
     const lista=fechas.get(c.fecha)??[]
@@ -77,9 +79,11 @@ export function calcularSeguimientoLote(
     if(!asignacion)continue
     programados++
     const components=asignacion.componentes??[]
-    for(const c of components)producto(c.producto_id).planificado+=Number(c.cantidad_diaria)
+    const censo=eventosPorFecha.get(fecha)?.animales??animalesActuales
+    for(const c of components)producto(c.producto_id).planificado+=Number(c.cantidad_diaria)*(asignacion.modo_racion==='ANIMAL'?censo:1)
     const entradas=fechas.get(fecha)??[]
-    const confirmacion=entradas.some(c=>c.origen==='PLAN'&&c.observaciones==='PLAN_ASIGNACION:'+asignacion.id)
+    const confirmacion=entradas.some(c=>c.origen==='PLAN'&&(
+      c.observaciones==='PLAN_ASIGNACION:'+asignacion.id || c.observaciones?.startsWith('AUTO_PLAN_ASIGNACION:'+asignacion.id+'|')))
     const manual=entradas.some(c=>c.origen==='REAL')
     if(entradas.length)registrados++
     if(confirmacion)confirmados++

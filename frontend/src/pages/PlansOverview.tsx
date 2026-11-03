@@ -5,10 +5,10 @@ import { TableScroll } from '../components/TableScroll'
 import { PlanCatalog } from './PlanCatalog'
 import {
   calcularSeguimientoLote,
-  type Asignacion, type ComponentePlan, type Consumo, type DetalleConsumo
+  type Asignacion, type ComponentePlan, type Consumo, type DetalleConsumo, type EventoAutomatico
 } from '../utils/feedingTracking'
 
-type Plan = { id:number; nombre:string; descripcion:string|null; activo:boolean }
+type Plan = { id:number; nombre:string; descripcion:string|null; activo:boolean; modo_racion:'LOTE'|'ANIMAL' }
 type Detail = ComponentePlan & {plan_id:number}
 type Producto = { id:number; nombre:string }
 type Unidad = { id:number; nombre:string; codigo:string }
@@ -35,9 +35,8 @@ async function paginar(tabla:'consumo'|'detalle_consumo',columnas:string){
   return {datos,limitado:true}
 }
 
-export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfirmDaily}:{
-  esAdmin?:boolean;initialLoteId?:number|null;onSelectLote?:(loteId:number)=>void;
-  onConfirmDaily?:(asignacionId:number)=>void
+export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote}:{
+  esAdmin?:boolean;initialLoteId?:number|null;onSelectLote?:(loteId:number)=>void
 }){
   const [planes,setPlanes]=useState<Plan[]>([])
   const [detalles,setDetalles]=useState<Detail[]>([])
@@ -47,6 +46,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
   const [lotes,setLotes]=useState<Lote[]>([])
   const [consumos,setConsumos]=useState<Consumo[]>([])
   const [detalleConsumos,setDetalleConsumos]=useState<DetalleConsumo[]>([])
+  const [eventos,setEventos]=useState<EventoAutomatico[]>([])
   const [seleccion,setSeleccion]=useState(String(initialLoteId??''))
   const [nuevoPlan,setNuevoPlan]=useState('')
   const [vista,setVista]=useState<'planes'|'lotes'>(initialLoteId?'lotes':'planes')
@@ -62,16 +62,17 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
     setLoading(true);setError('')
     try{
       const resultados=await Promise.all([
-        supabase.from('plan_consumo').select('id,nombre,descripcion,activo').order('nombre'),
+        supabase.from('plan_consumo').select('id,nombre,descripcion,activo,modo_racion').order('nombre'),
         supabase.from('detalle_plan_consumo').select('id,plan_id,producto_id,cantidad_diaria,unidad_id'),
-        supabase.from('asignacion_plan_lote').select('id,plan_id,lote_id,fecha_inicio,fecha_fin,activo,observaciones,componentes').order('id'),
+        supabase.from('asignacion_plan_lote').select('id,plan_id,lote_id,fecha_inicio,fecha_fin,activo,observaciones,componentes,modo_racion').order('id'),
         supabase.from('producto').select('id,nombre'),
         supabase.from('unidad_medida').select('id,nombre,codigo'),
         supabase.from('lote').select('id,codigo,cantidad_actual,cantidad_original,estado').order('codigo'),
         paginar('consumo','id,lote_id,fecha,origen,observaciones'),
-        paginar('detalle_consumo','id,consumo_id,producto_id,cantidad,costo_total')
+        paginar('detalle_consumo','id,consumo_id,producto_id,cantidad,costo_total'),
+        supabase.from('sgic_alimentacion_auto_evento').select('id,lote_id,asignacion_id,fecha,estado,animales,detalle').order('fecha',{ascending:false}).limit(1000)
       ])
-      for(const result of resultados.slice(0,6)){
+      for(const result of [...resultados.slice(0,6),resultados[8]]){
         if('error' in result && result.error)throw result.error
       }
       const [p,d,a,pr,u,l]=resultados
@@ -88,6 +89,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
       setConsumos(cs.datos as Consumo[])
       setDetalleConsumos(ds.datos as DetalleConsumo[])
       setLimitado(cs.limitado||ds.limitado)
+      setEventos((resultados[8] as {data:unknown}).data as EventoAutomatico[]??[])
     }catch(e){
       setError(e instanceof Error?e.message:'No se pudo consultar el seguimiento alimentario.')
     }finally{setLoading(false)}
@@ -102,7 +104,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
   const planNombre=(id:number)=>planes.find(p=>p.id===id)?.nombre??'Plan #'+id
   const productoNombre=(id:number)=>productos.find(p=>p.id===id)?.nombre??'Insumo #'+id
   const unidadNombre=(id:number)=>unidades.find(u=>u.id===id)?.codigo??''
-  const resumen=useMemo(()=>calcularSeguimientoLote(Number(seleccion),asignaciones,consumos,detalleConsumos,hoy()),[seleccion,asignaciones,consumos,detalleConsumos])
+  const resumen=useMemo(()=>calcularSeguimientoLote(Number(seleccion),asignaciones,consumos,detalleConsumos,hoy(),eventos,lote?.cantidad_actual??0),[seleccion,asignaciones,consumos,detalleConsumos,eventos,lote?.cantidad_actual])
   const detallesPorConsumo=useMemo(()=>{
     const grupos=new Map<number,DetalleConsumo[]>()
     for(const d of detalleConsumos){const lista=grupos.get(d.consumo_id)??[];lista.push(d);grupos.set(d.consumo_id,lista)}
@@ -171,7 +173,8 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el cambio.')}
     finally{setBusy(false)}
   }
-  const confirmacionHoy=Boolean(vigente)&&consumos.some(c=>c.lote_id===lote?.id&&c.fecha===hoy()&&c.origen==='PLAN')
+  const erroresAutomaticos=eventos.filter(e=>e.estado==='ERROR')
+  const eventosLote=eventos.filter(e=>e.lote_id===lote?.id)
   const planActivoLote=vigente?planes.find(p=>p.id===vigente.plan_id):null
   const componentesVigentes=vigente?.componentes??[]
   const totalLotesConPlan=new Set(vigentes.map(a=>a.lote_id)).size
@@ -181,13 +184,18 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Gestión de alimentación</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Administra los planes por separado, consulta los lotes que los utilizan y revisa el consumo diario confirmado. Asignar un plan no descuenta inventario.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Administra los planes por separado, consulta los lotes que los utilizan y revisa los consumos calculados automáticamente. El sistema aplica el plan al cierre de cada día, sin confirmación manual.</p>
         </div>
         <button type="button" onClick={()=>void cargar()} disabled={loading||busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Actualizar datos</button>
       </div>
     </header>
     {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{error}</div>}
     {aviso&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{aviso}</div>}
+    {erroresAutomaticos.length>0&&<div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+      <strong>{erroresAutomaticos.length} jornada(s) de alimentación automática pendientes.</strong>
+      <p className="mt-1">Revisa el inventario o la configuración del plan. SGIC reintentará el descuento automáticamente cuando la condición se resuelva.</p>
+      {erroresAutomaticos.slice(0,5).map(e=><p key={e.id} className="mt-1 text-xs">{lotes.find(l=>l.id===e.lote_id)?.codigo??'Lote #'+e.lote_id} · {fecha(e.fecha)} · {e.detalle}</p>)}
+    </div>}
     {limitado&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">El historial supera los 10.000 registros consultados. Los totales pueden ser parciales; consulta el histórico completo antes de tomar decisiones de costos.</div>}
     {loading?<p className="rounded-xl bg-white p-6 text-sm text-slate-600">Calculando seguimiento alimentario…</p>:<>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -211,7 +219,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
               {lotes.map(x=><option key={x.id} value={x.id}>{x.codigo} · {x.cantidad_actual} animales · {x.estado==='ACTIVO'?'Activo':'Cerrado'}</option>)}
             </select>
           </div>
-          {vigente&&lote?.estado==='ACTIVO'&&onConfirmDaily&&<button type="button" onClick={()=>onConfirmDaily(vigente.id)} disabled={confirmacionHoy} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-default disabled:bg-slate-400">{confirmacionHoy?'Alimentación de hoy confirmada':'Confirmar alimentación del día'}</button>}
+          {vigente&&<span className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">Descuento programado automáticamente al cierre del día</span>}
         </div>
         {lote&&<>
           <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -223,8 +231,8 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
               </div>
               <span className={'rounded-full px-3 py-1 text-xs font-semibold '+(vigente?'bg-emerald-100 text-emerald-800':'bg-slate-200 text-slate-700')}>{vigente?'Asignado':'Sin asignar'}</span>
             </div>
-            {componentesVigentes.length>0&&<div className="mt-3 flex flex-wrap gap-2">{componentesVigentes.map(c=><span key={c.id} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs">{productoNombre(c.producto_id)}: {cantidad(Number(c.cantidad_diaria))} {unidadNombre(c.unidad_id)}/día</span>)}</div>}
-            {lote.cantidad_original!==lote.cantidad_actual&&vigente&&<p className="mt-3 text-xs font-medium text-amber-800">Atención: este lote pasó de {lote.cantidad_original} a {lote.cantidad_actual} animales. La ración está definida para el lote completo y no se recalcula automáticamente; revisa las cantidades al confirmar la alimentación.</p>}
+            {componentesVigentes.length>0&&<div className="mt-3 flex flex-wrap gap-2">{componentesVigentes.map(c=><span key={c.id} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs">{productoNombre(c.producto_id)}: {cantidad(Number(c.cantidad_diaria))} {unidadNombre(c.unidad_id)}/{vigente?.modo_racion==='ANIMAL'?'ternero':'lote'} · Total previsto: {cantidad(Number(c.cantidad_diaria)*(vigente?.modo_racion==='ANIMAL'?(lote?.cantidad_actual??0):1))} {unidadNombre(c.unidad_id)}/día</span>)}</div>}
+            {lote.cantidad_original!==lote.cantidad_actual&&vigente&&<p className="mt-3 text-xs font-medium text-amber-800">Atención: este lote pasó de {lote.cantidad_original} a {lote.cantidad_actual} animales. {vigente?.modo_racion==='ANIMAL'?'La ración individual se ajustará automáticamente al número actual de animales al ejecutar el cargo.':'Este plan antiguo utiliza una cantidad fija por lote; el cambio de animales no modifica su total. Puedes crear otro plan por ternero.'}</p>}
           </div>
           {esAdmin&&lote.estado==='ACTIVO'&&<div className="mb-4 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[1fr_auto] md:items-end">
             <div><label htmlFor="nuevo-plan" className="mb-2 block text-sm font-semibold">{vigente?'Cambiar a otro plan':'Asignar plan'}</label>
@@ -246,7 +254,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
           {[
             ['Días con plan',resumen.diasProgramados,'Desde las fechas de asignación'],
             ['Días registrados',resumen.diasRegistrados,String(resumen.diasConfirmadosPlan)+' desde plan; '+String(resumen.diasConRegistroManual)+' con registro manual'],
-            ['Días sin registro',resumen.diasSinRegistro,'No implica que no se alimentó'],
+            ['Días pendientes',resumen.diasSinRegistro,'El cálculo se ejecuta al final del día; un fallo de stock queda pendiente'],
             ['Costo registrado',clp(resumen.costoTotal),'Alimentación imputada al lote']
           ].map(([label,value,nota])=><div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
             <p className="text-xs font-medium text-slate-500">{label}</p>
@@ -256,7 +264,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
         </div>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5"><h3 className="font-semibold">Consumo acumulado por producto</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Planificado: cantidades diarias congeladas en cada asignación × días de vigencia. Real durante plan: consumos registrados en esas fechas. Total real: incluye consumos fuera de un plan. Los valores no representan necesariamente alimento ingerido individualmente.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Planificado: ración por lote, o por animal × censo; para fechas sin ejecución se utiliza el censo actual como estimación. Real durante plan: consumos registrados en esas fechas. Total real: incluye consumos fuera de un plan. Los valores no representan necesariamente alimento ingerido individualmente.</p>
           </div>
           {resumen.productos.length===0?<p className="p-5 text-sm text-slate-500">Aún no hay cantidades programadas ni consumos registrados.</p>:
             <TableScroll><table className="min-w-full text-left text-sm">
@@ -280,7 +288,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
               <div className="max-h-80 space-y-2 overflow-y-auto">{resumen.diasRecientes.map(d=><div key={d.fecha} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
                 <span>{fecha(d.fecha)}</span>
                 <span className={'text-xs font-semibold '+(d.confirmadoPlan?'text-emerald-800':d.registrado?'text-sky-800':'text-amber-800')}>
-                  {d.confirmadoPlan?'Plan confirmado'+(d.registros>1?' · otros registros':''):d.registrado?'Registro manual':'Sin registro'}
+                  {d.confirmadoPlan?'Plan registrado'+(d.registros>1?' · otros registros':''):d.registrado?'Registro manual':'Pendiente de cierre automático'}
                 </span>
               </div>)}</div>}
           </section>
@@ -301,7 +309,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
         </div>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5"><h3 className="font-semibold">Últimos consumos registrados</h3>
-            <p className="mt-1 text-xs text-slate-500">Movimientos reales que descuentan inventario y acumulan costos para el lote.</p>
+            <p className="mt-1 text-xs text-slate-500">Movimientos automáticos de consumo planificado y registros manuales, que descuentan inventario e imputan sus costos al lote.</p>
           </div>
           {resumen.ultimosRegistros.length===0?<p className="p-5 text-sm text-slate-500">Aún no hay consumos registrados para este lote.</p>:
             <TableScroll><table className="min-w-full text-left text-sm">
@@ -310,7 +318,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
                 const lineas=detallesPorConsumo.get(c.id)??[]
                 return <tr key={c.id}>
                   <td className="whitespace-nowrap p-3">{fecha(c.fecha)}</td>
-                  <td className="p-3">{c.origen==='PLAN'?'Desde plan':'Manual'}</td>
+                  <td className="p-3">{c.origen==='PLAN'?(c.observaciones?.startsWith('AUTO_PLAN_')?'Automático (estimado)':'Desde plan (histórico)'):'Manual'}</td>
                   <td className="p-3">{lineas.map(d=>productoNombre(d.producto_id)+' '+cantidad(Number(d.cantidad))).join(' · ')||'Sin detalles'}</td>
                   <td className="whitespace-nowrap p-3 text-right">{clp(lineas.reduce((s,d)=>s+Number(d.costo_total),0))}</td>
                 </tr>
@@ -318,11 +326,19 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
             </table></TableScroll>}
         </section>
       </div>}
+      {lote&&eventosLote.length>0&&<section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="font-semibold">Bitácora de ejecución automática</h3>
+        <div className="mt-3 max-h-48 space-y-2 overflow-auto">{eventosLote.slice(0,15).map(e=><div key={e.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs">
+          <span>{fecha(e.fecha)} · {e.animales} animales</span>
+          <span className={e.estado==='APLICADO'?'text-emerald-800':'text-amber-800'}>{e.estado==='APLICADO'?'Inventario descontado':e.estado==='ERROR'?'Pendiente: '+e.detalle:'Registro manual previo'}</span>
+        </div>)}</div>
+      </section>}
       </>}
       {vista==='planes'&&<PlanCatalog planes={planes} detalles={detalles} asignaciones={asignaciones} lotes={lotes}
         productos={productos} unidades={unidades} esAdmin={esAdmin} busy={busy}
         onAssign={(loteId,planId)=>solicitarCambio(loteId,planId)}
         onManage={solicitarGestionPlan}
+        onModeChange={async(planId,modo)=>{if(!supabase)return;setBusy(true);setError('');try{const result=await supabase.rpc('sgic_configurar_modo_plan',{p_plan_id:planId,p_modo:modo});if(result.error)throw result.error;setAviso('Modalidad de cálculo actualizada.');await cargar()}catch(e){setError(e instanceof Error?e.message:'No se pudo modificar el plan')}finally{setBusy(false)}}}
         onOpenLote={loteId=>{setSeleccion(String(loteId));onSelectLote?.(loteId);setNuevoPlan('');setVista('lotes')}}/>}
     </>}
     <OperationConfirmDialog details={confirmacion?.details??null} onCancel={()=>setConfirmacion(null)} onConfirm={()=>void ejecutar()} busy={busy}/>

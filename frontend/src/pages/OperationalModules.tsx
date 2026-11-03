@@ -6,7 +6,7 @@ import { OperationConfirmDialog, type ConfirmDetails } from '../components/Opera
 import { AnimalSearch } from '../components/AnimalSearch'
 import { supabase } from '../api/supabase'
 
-type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number; raza_id?: number; precio_adquisicion?: number; apto_plan?:boolean }
+type Opt = { id: number | string; nombre?: string; codigo?: string; diio?: string; estado?: string; activo?: boolean; lote_id?: number; producto_id?: number; total?: number; numero_documento?: string | null; cantidad_base?: number; raza_id?: number; precio_adquisicion?: number; apto_plan?:boolean; modo_racion?:'LOTE'|'ANIMAL' }
 type Lists = Record<string, Opt[]>
 type Field = { key: string; label: string; source?: string; type?: string; optional?: boolean }
 type Spec = { title: string; role: 'ADMIN' | 'TODOS'; fields: Field[]; help: string }
@@ -33,7 +33,7 @@ const S: Record<string, Spec> = {
   confirmarVenta:{title:'Confirmar venta borrador',role:'ADMIN',help:'Congela el ingreso, los costos y los animales seleccionados. Es una operación irreversible.',fields:[F('venta_id','Borrador pendiente','venta')]},
   anularVenta:{title:'Anular venta borrador',role:'ADMIN',help:'Anula el borrador sin modificar el estado de los animales.',fields:[F('venta_id','Borrador pendiente','venta')]},
   venta: {title:'Confirmar venta por DIIO',role:'ADMIN',help:'Selecciona los animales exactos y registra ingreso y costos reconocidos. No se puede deshacer una venta confirmada.',fields:[F('comprador','Comprador',undefined,'text',true),F('total','Monto de venta (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
-  planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'Cantidad total por lote y día, en la unidad base del insumo. Habilita insumos en Inventario → Uso en planes.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria total del lote',undefined,'number')]},
+  planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'La cantidad se interpreta por ternero o por lote según el modo del plan seleccionado, en la unidad base del insumo. Habilita insumos en Inventario → Uso en planes.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria (según modalidad del plan)',undefined,'number')]},
   consumoPlan:{title:'Ejecutar consumo desde plan',role:'TODOS',help:'Aplica el plan diario, descuenta stock y evita repetirlo en la misma fecha.',fields:[F('asignacion_id','Asignación vigente','asignacion_plan_lote'),F('fecha','Fecha',undefined,'date')]},
   asignarPlan:{title:'Asignar plan alimentario a lote',role:'ADMIN',help:'Asigna la alimentación planificada a un lote activo.',fields:[F('plan_id','Plan','plan_consumo'),F('lote_id','Lote','lote'),F('fecha','Fecha de inicio',undefined,'date')]},
   presentacion:{title:'Presentación comercial',role:'ADMIN',help:'Equivalencia entre envase comercial y unidad base del producto.',fields:[F('producto_id','Producto','producto'),F('nombre','Nombre de presentación'),F('cantidad','Cantidad en unidad base',undefined,'number')]},
@@ -47,7 +47,7 @@ const contextualActions: Partial<Record<ModuleId,string[]>> = {
   lotes:['division','catalogo'],
   inventario:['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','productoEditar','ajuste'],
   compras:['ingresoInsumo'],
-  planes:['consumo','consumoPlan','planDetalle','catalogo'],
+  planes:['planDetalle','catalogo'],
   sanidad:['tratamiento'],
   ventas:['venta','borradorVenta'],
   gastos:['gasto'],
@@ -311,7 +311,7 @@ export function OperationalModules({
   const panelTitle=action==='catalogo'&&fixedCatalogType
     ?'Crear '+(catalogs.find(c=>c.id===fixedCatalogType)?.nombre.toLocaleLowerCase()??'registro')
     :S[action].title
-  const panelHelp=action==='catalogo'&&fixedCatalogType?({raza:'Agrega una raza para identificar los animales.',proveedor:'Guarda el nombre del proveedor. RUT y correo son opcionales.',categoria_gasto:'Crea una categoría para organizar los gastos del negocio.',unidad_medida:'Define la unidad y su abreviatura para medir existencias.',categoria_producto:'Agrega una clasificación para los insumos.',producto:'Crea un producto sin existencias. Para ingresar stock, utiliza Inventario.',plan_consumo:'Define el plan y luego añade los alimentos y sus cantidades diarias.',lote:'Crea un lote para agrupar los animales.'} as Record<string,string>)[fixedCatalogType]:S[action].help
+  const panelHelp=action==='catalogo'&&fixedCatalogType?({raza:'Agrega una raza para identificar los animales.',proveedor:'Guarda el nombre del proveedor. RUT y correo son opcionales.',categoria_gasto:'Crea una categoría para organizar los gastos del negocio.',unidad_medida:'Define la unidad y su abreviatura para medir existencias.',categoria_producto:'Agrega una clasificación para los insumos.',producto:'Crea un producto sin existencias. Para ingresar stock, utiliza Inventario.',plan_consumo:'Los planes nuevos calculan la ración por ternero automáticamente. Luego añade los alimentos, asigna el plan al lote y SGIC descontará el stock cada jornada.',lote:'Crea un lote para agrupar los animales.'} as Record<string,string>)[fixedCatalogType]:S[action].help
   return <section className="operation-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8" aria-label={panelTitle}>
     <div className="mb-6 flex items-start justify-between gap-3 border-b border-slate-100 pb-5">
       <div className="min-w-0">
@@ -329,6 +329,7 @@ export function OperationalModules({
             <div key={f.key} className="block text-sm">
               <label htmlFor={fieldId+f.key} className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
                 ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
+                :action==='planDetalle'&&f.key==='cantidad'?(lists.plan_consumo?.find(p=>String(p.id)===values.plan_id)?.modo_racion==='ANIMAL'?'Cantidad diaria por ternero (unidad base)':'Cantidad diaria total del lote (unidad base)')
                 :action==='catalogo'&&fixedCatalogType&&f.key==='nombre'?(fixedCatalogType==='lote'?'Código del lote':'Nombre'):f.label}</label>
               {f.source==='animal'?
                 <AnimalSearch inputId={fieldId+f.key} options={options('animal').map(o=>({id:o.id,diio:o.diio||String(o.id),detail:animalDetail(o)}))}

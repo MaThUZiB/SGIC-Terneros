@@ -1,5 +1,7 @@
 # Auditoría UX/UI de SGIC Terneros — 3 de noviembre de 2026
 
+**Actualización de fase 2:** se implementaron la barra inferior móvil con «Más», paginación en los registros principales, fichas móviles para animales, inventario, rentabilidad e historial y mejoras de navegación por teclado. Documentación y pruebas: [Implementación UX — fase 2](IMPLEMENTACION_UX_FASE_2_2026-11.md). Los apartados de deuda que siguen describen hallazgos originales de la auditoría, no tareas necesariamente pendientes.
+
 ## Alcance
 
 Revisión de la aplicación actualmente utilizada con Supabase (`CloudWorkspacePage` y componentes asociados), sus flujos de animales, lotes, inventario, compras, alimentación, ventas, sanidad, gastos, rentabilidad, solicitudes, configuración, auditoría y usuarios. También se revisaron los formularios de SIPECweb, la venta por DIIO, la navegación y las fichas individuales.

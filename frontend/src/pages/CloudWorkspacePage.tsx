@@ -248,33 +248,31 @@ export function CloudWorkspacePage() {
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (
-              <div className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                   <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
                   <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
                   <Indicador nombre="Valor base del ganado activo" valor={formatoDinero(adquisiciones)} nota="Adquisición de animales activos" onClick={()=>abrirModulo("compras")} />
                   <Indicador nombre="Bajas por fallecimiento" valor={formatoDinero(bajas)} nota="Valor de adquisición · separado del ganado activo" onClick={()=>abrirModulo("animales","FALLECIDO")} />
                   <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
                 </div>
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="font-semibold">Estado de lotes</h2>
-                    <div className="mt-5 space-y-3">
-                      {datos.lotes.map(l => (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <section className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Lotes</h2><button type="button" onClick={()=>abrirModulo('lotes')} className="text-xs font-medium text-emerald-800 hover:underline">Ver todos</button></div>
+                    <div className="mt-3 space-y-1.5">
+                      {datos.lotes.slice(0,6).map(l => (
                         <button type="button" onClick={()=>abrirModulo("lotes")} key={l.id} className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-left text-sm hover:bg-emerald-50">
-                          <div><div className="font-semibold">{l.codigo}</div><div className="mt-1 text-xs text-slate-500">{formatoCantidad(l.cantidad_actual)} animales</div></div>
+                          <div className="min-w-0"><span className="font-medium">{l.codigo}</span><span className="ml-2 text-xs text-slate-500">{formatoCantidad(l.cantidad_actual)} animales</span></div>
                           <Estado valor={l.estado} />
                         </button>
                       ))}
-                      {datos.lotes.length === 0 && <TablaVacia texto="No existen lotes registrados." />}
+                      {datos.lotes.length>6&&<p className="px-3 py-2 text-xs text-slate-500">+{datos.lotes.length-6} lotes más</p>}
+                       {datos.lotes.length === 0 && <TablaVacia texto="Sin lotes registrados." />}
                     </div>
                   </section>
-                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="font-semibold">Inventario y alertas</h2>
-                    <p className="mt-3 text-sm text-slate-600">
-                      {faltantes} de {datos.productos.length} productos están en o bajo el mínimo definido.
-                    </p>
-                    <div className="mt-5 space-y-3">
+                  <section className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Stock bajo <span className="ml-1 text-xs font-normal text-slate-500">({faltantes})</span></h2><button type="button" onClick={()=>abrirModulo('inventario')} className="text-xs font-medium text-emerald-800 hover:underline">Inventario</button></div>
+                    <div className="mt-3 space-y-1.5">
                       {datos.productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).slice(0,5).map(p => (
                         <button key={p.id} type="button" onClick={()=>abrirModulo("inventario")} className="flex w-full items-center justify-between rounded-xl bg-amber-50 px-4 py-3 text-left text-sm text-amber-950 hover:bg-amber-100">
                           <span className="font-medium">{p.nombre}</span><span>{formatoCantidad(p.stock_actual)} disponibles</span>
@@ -288,16 +286,14 @@ export function CloudWorkspacePage() {
             )}
 
             {tab==='lotes' && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold">Registro de lotes</h2>
-              <p className="mb-5 mt-1 text-sm text-slate-500">Existencias y estado de cada agrupación ganadera.</p>
+              <h2 className="mb-3 text-base font-semibold">Lotes <span className="text-sm font-normal text-slate-500">({datos.lotes.length})</span></h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {datos.lotes.map(l=><article key={l.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                   <div className="flex justify-between gap-3"><strong>{l.codigo}</strong><Estado valor={l.estado}/></div>
-                  <p className="mt-4 text-2xl font-semibold">{formatoCantidad(l.cantidad_actual)}</p>
-                  <p className="text-sm text-slate-500">animales registrados actualmente</p>
+                  <p className="mt-2 text-xl font-semibold tabular-nums">{formatoCantidad(l.cantidad_actual)} <span className="text-xs font-normal text-slate-500">animales</span></p>
                   <button type="button" onClick={()=>abrirModulo('animales','TODOS',l.codigo)}
-                    className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales del lote →</button>
-                  <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline">Seguimiento alimentario →</button>
+                    className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales →</button>
+                  <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline">Seguimiento →</button>
                 </article>)}
                 {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
               </div>
@@ -311,7 +307,7 @@ export function CloudWorkspacePage() {
                   <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2>
                     {tab==='animales'
                       ? <p className="mt-1 text-sm text-slate-600">Cantidad total: <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)} animales</strong></p>
-                      : <p className="mt-1 text-xs text-slate-500">Cantidades en unidad base y equivalencias comerciales (no un conteo de envases sellados).</p>}
+                      : <p className="mt-1 text-xs text-slate-500">{datos.productos.length} productos</p>
                   </div>
                   <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
                     className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
@@ -323,7 +319,7 @@ export function CloudWorkspacePage() {
                   </button>)}
                 </div>}
                 {tab==='animales'&&<div className="border-b border-slate-100 px-5 py-2.5 text-xs text-slate-600" role="status">
-                  Mostrando <strong className="tabular-nums text-slate-900">{formatoCantidad(listaAnimales.length)}</strong> de <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)}</strong> animales registrados{filtroAnimal!=='TODOS'||buscar.trim()?' (según filtros y búsqueda)':''}.
+                  {formatoCantidad(listaAnimales.length)} resultados · {formatoCantidad(totalAnimales)} animales registrados
                 </div>}
                 <TableScroll>
                   {tab === 'animales' ? (

@@ -4,8 +4,8 @@ import { useId, type ReactNode } from 'react'
 export function TableScroll({children,className=''}:{children:ReactNode;className?:string}){
   const hint=useId()
   return <div className="min-w-0 max-w-full">
-    <p id={hint} className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-      Desliza la tabla ↔ ↕ para ver columnas y filas.
+    <p id={hint} className="sr-only">
+      Tabla desplazable en ambas direcciones; utiliza el gesto de deslizamiento o las flechas del teclado.
     </p>
     <div role="region" aria-label="Tabla de información desplazable" aria-describedby={hint}
       tabIndex={0} className={'table-scroll '+className}>{children}</div>

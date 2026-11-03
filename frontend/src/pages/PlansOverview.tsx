@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../api/supabase'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { TableScroll } from '../components/TableScroll'
+import { PlanCatalog } from './PlanCatalog'
 import {
   calcularSeguimientoLote,
   type Asignacion, type ComponentePlan, type Consumo, type DetalleConsumo
@@ -48,6 +49,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
   const [detalleConsumos,setDetalleConsumos]=useState<DetalleConsumo[]>([])
   const [seleccion,setSeleccion]=useState(String(initialLoteId??''))
   const [nuevoPlan,setNuevoPlan]=useState('')
+  const [vista,setVista]=useState<'planes'|'lotes'>(initialLoteId?'lotes':'planes')
   const [busy,setBusy]=useState(false)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
@@ -107,19 +109,21 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
     return grupos
   },[detalleConsumos])
 
-  function solicitarCambio(){
-    if(!lote||!nuevoPlan)return setError('Selecciona un lote y un plan.')
-    if(lote.estado!=='ACTIVO')return setError('Solo se pueden asignar planes a lotes activos.')
-    if(vigente?.plan_id===Number(nuevoPlan))return setError('El lote ya tiene asignado ese plan.')
-    const p=planes.find(x=>x.id===Number(nuevoPlan))
+  function solicitarCambio(loteId:number=Number(seleccion),planId:number=Number(nuevoPlan)){
+    const objetivo=lotes.find(l=>l.id===loteId)
+    const actual=vigentes.find(a=>a.lote_id===loteId)
+    if(!objetivo||!planId)return setError('Selecciona un lote y un plan.')
+    if(objetivo.estado!=='ACTIVO')return setError('Solo se pueden asignar planes a lotes activos.')
+    if(actual?.plan_id===planId)return setError('El lote ya tiene asignado ese plan.')
+    const p=planes.find(x=>x.id===planId)
     if(!p?.activo)return setError('Selecciona un plan activo.')
     if(!detalles.some(d=>d.plan_id===p.id))return setError('El plan aún no tiene alimentos definidos.')
     setError('');setAviso('')
-    setConfirmacion({kind:'assign',planId:p.id,loteId:lote.id,details:{
-      title:vigente?'Cambiar plan del lote':'Asignar plan al lote',
+    setConfirmacion({kind:'assign',planId:p.id,loteId:objetivo.id,details:{
+      title:actual?'Cambiar plan del lote':'Asignar plan al lote',
       description:'La modificación se aplica desde hoy. Los consumos ya registrados y sus costos no se borrarán. No se descuenta inventario hasta confirmar la alimentación diaria. Si hoy ya se confirmó el plan anterior, el cambio se deberá hacer mañana.',
-      confirmLabel:vigente?'Cambiar plan':'Asignar plan',
-      summary:[{label:'Lote',value:lote.codigo},{label:'Plan anterior',value:vigente?planNombre(vigente.plan_id):'Sin plan'},{label:'Nuevo plan',value:p.nombre,emphasis:true}]
+      confirmLabel:actual?'Cambiar plan':'Asignar plan',
+      summary:[{label:'Lote',value:objetivo.codigo},{label:'Plan anterior',value:actual?planNombre(actual.plan_id):'Sin plan'},{label:'Nuevo plan',value:p.nombre,emphasis:true}]
     }})
   }
   function solicitarDesasignar(){
@@ -176,8 +180,8 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
       <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Producción · alimentación</p>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Planes y seguimiento por lote</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Consulta lo programado frente al consumo registrado, costos acumulados y días pendientes. Un plan asignado no descuenta inventario: se descuenta al confirmar el consumo real.</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Gestión de alimentación</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Administra los planes por separado, consulta los lotes que los utilizan y revisa el consumo diario confirmado. Asignar un plan no descuenta inventario.</p>
         </div>
         <button type="button" onClick={()=>void cargar()} disabled={loading||busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Actualizar datos</button>
       </div>
@@ -191,6 +195,13 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
         <div className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Lotes con plan vigente</p><strong className="mt-2 block text-2xl">{totalLotesConPlan}</strong></div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Lotes sin plan vigente</p><strong className="mt-2 block text-2xl">{lotes.filter(x=>x.estado==='ACTIVO'&&!vigentes.some(a=>a.lote_id===x.id)).length}</strong></div>
       </div>
+      <nav aria-label="Vistas de alimentación" className="flex flex-wrap gap-2">
+        <button type="button" aria-pressed={vista==='planes'} onClick={()=>setVista('planes')}
+          className={'rounded-xl px-4 py-2.5 text-sm font-semibold '+(vista==='planes'?'bg-emerald-900 text-white':'border border-slate-200 bg-white text-slate-700')}>Gestión de planes</button>
+        <button type="button" aria-pressed={vista==='lotes'} onClick={()=>setVista('lotes')}
+          className={'rounded-xl px-4 py-2.5 text-sm font-semibold '+(vista==='lotes'?'bg-emerald-900 text-white':'border border-slate-200 bg-white text-slate-700')}>Seguimiento por lote</button>
+      </nav>
+      {vista==='lotes'&&<>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -224,7 +235,7 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
               <p className="mt-2 text-xs text-slate-500">Aplicación desde hoy. El plan anterior queda en el historial; no se altera el stock.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={solicitarCambio} disabled={!nuevoPlan||busy} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{vigente?'Cambiar plan':'Asignar plan'}</button>
+              <button type="button" onClick={()=>solicitarCambio()} disabled={!nuevoPlan||busy} className="rounded-xl bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{vigente?'Cambiar plan':'Asignar plan'}</button>
               {vigente&&<button type="button" onClick={solicitarDesasignar} disabled={busy} className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50">Desasignar</button>}
             </div>
           </div>}
@@ -307,20 +318,12 @@ export function PlansOverview({esAdmin=false,initialLoteId,onSelectLote,onConfir
             </table></TableScroll>}
         </section>
       </div>}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h3 className="font-semibold">Planes disponibles</h3>
-        <p className="mt-1 text-xs text-slate-500">Composición nominal de los planes maestros. Cada nueva asignación conserva su propia versión de cantidades.</p>
-        {planes.length===0?<p className="mt-4 text-sm text-slate-500">No existen planes. Crea uno desde «Crear nuevo registro» y agrega sus alimentos.</p>:
-          <div className="mt-4 grid gap-3 md:grid-cols-2">{planes.map(p=><details key={p.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <summary className="cursor-pointer text-sm font-semibold">{p.nombre} <span className="ml-2 text-xs font-normal text-slate-500">{p.activo?'Activo':'Inactivo'}</span></summary>
-            <p className="mt-2 text-xs text-slate-600">{p.descripcion??'Sin descripción'}</p>
-            <div className="mt-3 space-y-1 text-xs text-slate-700">{detalles.filter(d=>d.plan_id===p.id).map(d=><p key={d.id}>{productoNombre(d.producto_id)} · {cantidad(Number(d.cantidad_diaria))} {unidadNombre(d.unidad_id)}/día</p>)}</div>
-            {esAdmin&&<div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
-              {p.activo?<button type="button" disabled={busy||asignaciones.some(a=>a.plan_id===p.id&&a.activo)} onClick={()=>solicitarGestionPlan(p,'ARCHIVAR')} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50">Archivar</button>:<button type="button" disabled={busy} onClick={()=>solicitarGestionPlan(p,'REACTIVAR')} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800">Reactivar</button>}
-              {asignaciones.every(a=>a.plan_id!==p.id)&&<button type="button" disabled={busy} onClick={()=>solicitarGestionPlan(p,'ELIMINAR')} className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800">Eliminar</button>}
-            </div>}
-          </details>)}</div>}
-      </section>
+      </>}
+      {vista==='planes'&&<PlanCatalog planes={planes} detalles={detalles} asignaciones={asignaciones} lotes={lotes}
+        productos={productos} unidades={unidades} esAdmin={esAdmin} busy={busy}
+        onAssign={(loteId,planId)=>solicitarCambio(loteId,planId)}
+        onManage={solicitarGestionPlan}
+        onOpenLote={loteId=>{setSeleccion(String(loteId));onSelectLote?.(loteId);setNuevoPlan('');setVista('lotes')}}/>}
     </>}
     <OperationConfirmDialog details={confirmacion?.details??null} onCancel={()=>setConfirmacion(null)} onConfirm={()=>void ejecutar()} busy={busy}/>
   </section>

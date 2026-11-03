@@ -26,17 +26,20 @@ export function UserManagement() {
     setWorking('')
   }
   return <div className="space-y-5">
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold">Usuarios y permisos</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">
-        Las cuentas se crean o invitan desde Supabase Authentication. Aquí puedes activar,
-        suspender o cambiar su rol. Los cambios se validan en PostgreSQL y quedan auditados.
-      </p>
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Usuarios <span className="text-sm font-normal text-slate-500">({rows.length})</span></h2>
+        <button onClick={()=>void reload()} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">Actualizar</button>
+      </div>
+      <details className="mt-2 text-xs text-slate-600">
+        <summary className="cursor-pointer">Administrar accesos</summary>
+        <p className="mt-1">Las cuentas se crean en Supabase Authentication. Aquí puedes cambiar su rol o activación; los cambios quedan auditados.</p>
+      </details>
       {error&&<p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {ok&&<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{ok}</p>}
       {loading&&<p className="mt-4 text-sm text-slate-500">Cargando usuarios…</p>}
-      <div className="mt-5 space-y-3">
-        {rows.map(u=><div key={u.id} className="grid gap-4 rounded-xl border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_150px_110px] sm:items-center">
+      <div className="mt-4 space-y-2">
+        {rows.map(u=><div key={u.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_150px_100px] sm:items-center">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-slate-900">{u.nombre||u.email}</div>
             <div className="truncate text-xs text-slate-500">{u.email}</div>
@@ -55,7 +58,7 @@ export function UserManagement() {
         </div>)}
       </div>
       {!loading&&rows.length===0&&!error&&<p className="text-sm text-slate-500">No hay perfiles registrados.</p>}
-      <button onClick={()=>void reload()} className="mt-5 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Actualizar usuarios</button>
+
     </div>
   </div>
 }

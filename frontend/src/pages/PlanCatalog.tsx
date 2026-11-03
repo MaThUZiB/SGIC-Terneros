@@ -17,6 +17,7 @@ type Props = {
 const formato=(n:number)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:3}).format(n)
 const fecha=(s:string)=>s.split('-').reverse().join('-')
 const control='w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700'
+const normalizar=(valor:string)=>valor.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim()
 
 /** Catálogo y asignaciones: cada plan es independiente de su seguimiento por lote. */
 export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidades,esAdmin,busy,onAssign,onManage,onOpenLote,onModeChange}:Props){
@@ -24,9 +25,10 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
   const [filtro,setFiltro]=useState<'TODOS'|'ACTIVOS'|'ARCHIVADOS'>('TODOS')
   const [seleccion,setSeleccion]=useState<number|null>(null)
   const [destino,setDestino]=useState('')
+  const consulta=normalizar(busqueda)
   const visibles=planes.filter(p=>
     (filtro==='TODOS'||(filtro==='ACTIVOS'?p.activo:!p.activo))&&
-    (p.nombre+' '+(p.descripcion??'')).toLocaleLowerCase('es').includes(busqueda.trim().toLocaleLowerCase('es'))
+    normalizar(p.nombre+' '+(p.descripcion??'')).includes(consulta)
   )
   const actual=visibles.find(p=>p.id===seleccion)??visibles[0]??null
   const componentes=actual?detalles.filter(d=>d.plan_id===actual.id):[]
@@ -38,13 +40,17 @@ export function PlanCatalog({planes,detalles,asignaciones,lotes,productos,unidad
   return <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
     <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5">
       <h3 className="text-lg font-semibold">Catálogo de planes</h3>
-      <p className="mt-1 text-sm text-slate-600">Selecciona un plan para revisar sus alimentos, lotes vigentes e historial.</p>
+      <p className="mt-1 text-sm text-slate-600">Hay <strong className="tabular-nums">{planes.length} planes registrados</strong>. Selecciona uno para ver sus alimentos, lotes e historial.</p>
       <label htmlFor="buscar-plan" className="sr-only">Buscar planes</label>
       <input id="buscar-plan" type="search" value={busqueda} onChange={e=>setBusqueda(e.target.value)} className={control+' mt-4'} placeholder="Buscar plan por nombre o descripción"/>
       <div className="mt-3 flex flex-wrap gap-2">{([['TODOS','Todos'],['ACTIVOS','Activos'],['ARCHIVADOS','Archivados']] as const).map(([id,label])=>
         <button type="button" key={id} aria-pressed={filtro===id} onClick={()=>{setFiltro(id);setSeleccion(null);setDestino('')}} className={'rounded-lg px-3 py-2 text-xs font-semibold '+(filtro===id?'bg-slate-900 text-white':'border border-slate-200 text-slate-700')}>{label}</button>
       )}</div>
-      {visibles.length===0?<p className="mt-4 text-sm text-slate-500">Sin planes para este filtro. Puedes crear uno con «Crear nuevo registro» en las acciones superiores.</p>:
+      <p className="mt-3 text-xs text-slate-500" role="status">{visibles.length} de {planes.length} planes visibles.</p>
+      {visibles.length===0?<div className="mt-4 space-y-3 text-sm text-slate-500">
+        <p>{planes.length===0?'No hay planes disponibles para esta cuenta.':consulta?'No hay planes que coincidan con la búsqueda.':'No hay planes con el estado seleccionado.'}</p>
+        {(consulta||filtro!=='TODOS')&&<button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800" onClick={()=>{setBusqueda('');setFiltro('TODOS');setSeleccion(null)}}>Limpiar búsqueda y filtros</button>}
+      </div>:
       <div className="mt-4 max-h-[680px] space-y-2 overflow-y-auto pr-1">
         {visibles.map(p=>{
           const asignadas=asignaciones.filter(a=>a.plan_id===p.id)

@@ -210,7 +210,7 @@ export function CloudWorkspacePage() {
         {!error && datos && (
           <>
             {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
-              {tab!=='catalogos'&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3">
+              {tab!=='catalogos'&&tab!=='planes'&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3">
                 {visibleActions.slice(0,2).map((item,index)=><button type="button" key={item.id}
                   onClick={()=>{operation===item.id?closeOperation():openOperation(item.id)}}
                   aria-expanded={operation===item.id}
@@ -244,7 +244,8 @@ export function CloudWorkspacePage() {
             {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId} />}
+            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId}
+               onCreatePlan={()=>openOperation('catalogo')} onAddFood={()=>openOperation('planDetalle')} onViewTracking={closeOperation} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (

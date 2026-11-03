@@ -1,6 +1,5 @@
 import { CatalogOverview } from './CatalogOverview'
 import { useWorkspaceNavigation } from '../hooks/useWorkspaceNavigation'
-import { TableScroll } from '../components/TableScroll'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../api/supabase'
@@ -11,7 +10,6 @@ import { DomainRecords } from './DomainRecords'
 import { UserManagement } from './UserManagement'
 import { ProfitabilityReport } from './ProfitabilityReport'
 import { SupplyHistory } from './SupplyHistory'
-import { StockPresentations } from '../components/StockPresentations'
 import type { PresentacionStock } from '../utils/presentationStock'
 import { SupplyOperations, supplyActions } from './SupplyOperations'
 import { PlansOverview } from './PlansOverview'
@@ -20,6 +18,7 @@ import { SipecSyncPreview } from './SipecSyncPreview'
 import { SaleIndividualPrices } from './SaleIndividualPrices'
 import { AnimalCard, type AnimalRecord } from './AnimalCard'
 import { MatusFooter } from '../components/MatusFooter'
+import { PaginatedRegistry } from './PaginatedRegistry'
 
 type Animal = AnimalRecord
 type Lote = { id: number; codigo: string; cantidad_actual: number; estado: string }
@@ -78,6 +77,19 @@ export function CloudWorkspacePage() {
   useEffect(() => {
     let vigente = true
 
+    async function cargarTodos<T>(tabla:string,columnas:string):Promise<T[]>{
+      const all:T[]=[]
+      const size=1000
+      for(let inicio=0;inicio<200000;inicio+=size){
+        const result=await supabase!.from(tabla).select(columnas).order('id',{ascending:true}).range(inicio,inicio+size-1)
+        if(result.error)throw new Error(result.error.message)
+        const items=(result.data??[]) as unknown as T[]
+        all.push(...items)
+        if(items.length<size)return all
+      }
+      throw new Error('La consulta excede el máximo esperado. Usa filtros en el registro.')
+    }
+
     async function cargar() {
       if (!supabase) {
         setError('Falta configurar el cliente Supabase.')
@@ -89,9 +101,9 @@ export function CloudWorkspacePage() {
       setError('')
       try {
         const [a, l, p, pr, ca, ci, da, di, ra, pp] = await Promise.all([
-          supabase.from('animal').select('id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones').order('diio').limit(1000),
+          cargarTodos<Animal>('animal','id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones'),
           supabase.from('lote').select('id,codigo,cantidad_actual,estado').order('codigo').limit(500),
-          supabase.from('producto').select('id,nombre,stock_actual,stock_minimo,costo_promedio,tipo_insumo,unidad_medida(codigo)').order('nombre').limit(500),
+          cargarTodos<Producto>('producto','id,nombre,stock_actual,stock_minimo,costo_promedio,tipo_insumo,unidad_medida(codigo)'),
           supabase.from('proveedor').select('id,nombre').order('nombre').limit(200),
           supabase.from('compra_animal').select('id,fecha,total,proveedor_id').order('fecha', { ascending: false }).limit(300),
           supabase.from('compra_insumo').select('id,fecha,total,estado,numero_documento,proveedor_id').order('fecha', { ascending: false }).limit(300),
@@ -100,14 +112,14 @@ export function CloudWorkspacePage() {
           supabase.from('raza').select('id,nombre').order('nombre').limit(1000),
           supabase.from('presentacion_producto').select('id,producto_id,nombre,cantidad_base,activa').eq('activa',true).order('id',{ascending:false}).limit(1000),
         ])
-        const fallo = [a.error, l.error, p.error, pr.error, ca.error, ci.error, da.error, di.error, ra.error, pp.error].find(Boolean)
+        const fallo = [l.error, pr.error, ca.error, ci.error, da.error, di.error, ra.error, pp.error].find(Boolean)
         if (fallo) throw new Error(fallo.message)
         if (vigente) {
           setDatos({
-            animales: (a.data ?? []) as Animal[],
+            animales:a,
             razas: ra.data??[],
             lotes: (l.data ?? []) as Lote[],
-            productos: (p.data ?? []) as unknown as Producto[],
+            productos:p,
             presentaciones: (pp.data ?? []) as PresentacionStock[],
             proveedores: (pr.data ?? []) as Proveedor[],
             comprasAnimal: (ca.data ?? []) as CompraAnimal[],
@@ -130,32 +142,11 @@ export function CloudWorkspacePage() {
   const lotesPorId = useMemo(() => new Map((datos?.lotes ?? []).map(l => [l.id, l.codigo])), [datos])
   const razasPorId = new Map((datos?.razas??[]).map(r=>[r.id,r.nombre]))
   const fichaAnimal = datos?.animales.find(a=>a.id===animalCard?.id)
-  const listaAnimales = (datos?.animales ?? []).filter(a =>
-    (filtroAnimal==='TODOS'||a.estado===filtroAnimal) && (a.diio.toLowerCase().includes(buscar.trim().toLowerCase()) || (razasPorId.get(a.raza_id)??'').toLowerCase().includes(buscar.trim().toLowerCase()) ||
-    (lotesPorId.get(a.lote_id) ?? '').toLowerCase().includes(buscar.toLowerCase())),
-  )
-  const listaProductos = (datos?.productos ?? []).filter(p => p.nombre.toLowerCase().includes(buscar.toLowerCase()))
-  const presentacionesPorProducto = useMemo(() => {
-    const agrupadas = new Map<number, PresentacionStock[]>()
-    for (const presentacion of datos?.presentaciones ?? []) {
-      const lista = agrupadas.get(presentacion.producto_id) ?? []
-      lista.push(presentacion)
-      agrupadas.set(presentacion.producto_id, lista)
-    }
-    return agrupadas
-  }, [datos])
   const bajas = (datos?.animales ?? []).filter(a=>a.estado==='FALLECIDO').reduce((s,a)=>s+Number(a.precio_adquisicion),0)
   const adquisiciones = (datos?.animales ?? []).filter(a=>a.estado==='ACTIVO').reduce((s, a) => s + Number(a.precio_adquisicion), 0)
   const valorStock = (datos?.productos ?? []).reduce((s, p) => s + Number(p.stock_actual) * Number(p.costo_promedio), 0)
   const demo = (datos?.animales ?? []).some(a => a.diio.startsWith('DEMO-'))
-  const totalAnimales = datos?.animales.length ?? 0
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
-  const animalesFallecidos = (datos?.animales ?? []).filter(a => a.estado === 'FALLECIDO').length
-  const animalesVendidos = (datos?.animales ?? []).filter(a => a.estado === 'VENDIDO').length
-  const totalPorEstado:Record<string,number> = {
-    TODOS:totalAnimales, ACTIVO:animalesActivos,
-    FALLECIDO:animalesFallecidos, VENDIDO:animalesVendidos,
-  }
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
 
   const availableActions=getModuleActions(tab,esAdmin)
@@ -298,50 +289,10 @@ export function CloudWorkspacePage() {
             {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id}
               animal={fichaAnimal} raza={razasPorId.get(fichaAnimal.raza_id)??'Sin raza'} lote={lotesPorId.get(fichaAnimal.lote_id)??'Sin lote'}
               esAdmin={esAdmin} action={animalCard.action??null} onAction={setAnimalAction} onClose={closeAnimal} onChanged={()=>setRevision(x=>x+1)}/>}
-            {(tab === 'animales' || tab === 'inventario') && (
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div><h2 className="font-semibold">{tab === 'animales' ? 'Registro de animales' : 'Existencias de inventario'}</h2>
-                    {tab==='animales'
-                      ? <p className="mt-1 text-sm text-slate-600">Cantidad total: <strong className="tabular-nums text-slate-900">{formatoCantidad(totalAnimales)} animales</strong></p>
-                      : <p className="mt-1 text-xs text-slate-500">{datos.productos.length} productos</p>}
-                  </div>
-                  <input aria-label="Filtrar registros" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={tab==='animales'?"Escribe DIIO, raza o lote":"Buscar producto"}
-                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-emerald-600 sm:w-72" />
-                </div>
-                {tab==='animales'&&<div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3" aria-label="Filtrar animales por estado">
-                  {(['TODOS','ACTIVO','FALLECIDO','VENDIDO'] as const).map(state=><button key={state} type="button" onClick={()=>setFiltroAnimal(state)}
-                    className={`rounded-full border px-3.5 py-2 text-xs font-semibold ${filtroAnimal===state?'border-emerald-900 bg-emerald-900 text-white':'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
-                    {state==='TODOS'?'Todos':state==='ACTIVO'?'Activos':state==='FALLECIDO'?'Fallecidos':'Vendidos'} ({formatoCantidad(totalPorEstado[state])})
-                  </button>)}
-                </div>}
-                {tab==='animales'&&<div className="border-b border-slate-100 px-5 py-2.5 text-xs text-slate-600" role="status">
-                  {formatoCantidad(listaAnimales.length)} resultados · {formatoCantidad(totalAnimales)} animales registrados
-                </div>}
-                <TableScroll>
-                  {tab === 'animales' ? (
-                    listaAnimales.length === 0 ? <TablaVacia texto="No se encontraron animales." /> : (
-                      <table className="min-w-full text-left text-sm">
-                        <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">DIIO / ficha</th><th className="p-4">Raza</th><th className="p-4">Lote</th><th className="p-4">Sexo</th><th className="p-4">Peso inicial</th><th className="p-4">Valor base</th><th className="p-4">Estado</th></tr></thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {listaAnimales.map(a => <tr key={a.id} className={a.estado==='FALLECIDO'?'bg-rose-50/70 hover:bg-rose-100':'hover:bg-slate-50'}><td className="p-4 font-semibold"><button type="button" className="text-emerald-800 underline underline-offset-4" aria-label={'Abrir ficha DIIO '+a.diio} onClick={()=>openAnimal(a.id)}>{a.diio}</button></td><td className="p-4">{razasPorId.get(a.raza_id)??'—'}</td><td className="p-4">{lotesPorId.get(a.lote_id) ?? '—'}</td><td className="p-4">{a.sexo}</td><td className="p-4">{a.peso_ingreso_kg != null ? `${formatoCantidad(a.peso_ingreso_kg)} kg` : '—'}</td><td className="p-4">{formatoDinero(a.precio_adquisicion)}</td><td className="p-4"><Estado valor={a.estado} /></td></tr>)}
-                        </tbody>
-                      </table>
-                    )
-                  ) : (
-                    listaProductos.length === 0 ? <TablaVacia texto="No se encontraron productos." /> : (
-                      <table className="min-w-full text-left text-sm">
-                        <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-4">Producto</th><th className="p-4">Existencia</th><th className="p-4">Mínimo</th><th className="p-4">PMP</th><th className="p-4">Valorización</th></tr></thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {listaProductos.map(p => <tr key={p.id} className="hover:bg-slate-50"><td className="p-4 font-semibold">{p.nombre}</td><td className="p-4"><div className="font-semibold">{formatoCantidad(p.stock_actual)} {p.unidad_medida?.codigo}</div><StockPresentations stock={Number(p.stock_actual)} unidad={p.unidad_medida?.codigo ?? 'unidad'} presentaciones={presentacionesPorProducto.get(p.id) ?? []}/></td><td className="p-4">{formatoCantidad(p.stock_minimo)} {p.unidad_medida?.codigo}</td><td className="p-4">{formatoDinero(p.costo_promedio)}</td><td className="p-4">{formatoDinero(p.stock_actual * p.costo_promedio)}</td></tr>)}
-                        </tbody>
-                      </table>
-                    )
-                  )}
-                </TableScroll>
-              </section>
-            )}
-
+            {(tab==='animales'||tab==='inventario')&&<PaginatedRegistry key={tab}
+              type={tab} search={buscar} filter={filtroAnimal} onFilter={setFiltroAnimal}
+              onOpenAnimal={openAnimal} revision={revision} presentaciones={datos.presentaciones}/>}
+            
             {tab === 'compras' && (
               <div className="grid gap-5 lg:grid-cols-2">
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

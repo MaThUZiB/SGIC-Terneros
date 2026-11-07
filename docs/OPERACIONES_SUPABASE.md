@@ -87,17 +87,18 @@ El saldo se concilia como `entradas − salidas + ajustes firmados`; los registr
 
 ## 6. Alimentación y sanidad
 
-### Registrar un consumo por período (vigente)
+### Registrar alimentación mediante suministros (vigente)
 
-1. Entrar en **Alimentación** y pulsar **Registrar período**.
-2. Seleccionar un lote, **fecha desde** y **fecha hasta**. Se admiten intervalos ya finalizados, incluso si los animales del lote se ingresaron posteriormente desde SIPECweb.
-3. Añadir los insumos de **leche o concentrado** utilizados en ese intervalo. La cantidad corresponde al **total aproximado para el lote**, no a una ración individual ni a una jornada exacta.
-4. Opcionalmente elegir una presentación, como saco de 25 kg; SGIC transforma automáticamente esa cantidad a la unidad base y muestra el costo orientativo al PMP actual.
-5. Mantener la casilla **Descontar del inventario al registrar** para reconocer una salida única por cada producto y contabilizar el costo en el lote, en kardex y en rentabilidad. El inventario debe contener existencias suficientes.
-6. Para reconstruir una semana anterior cuyos insumos ya fueron utilizados y no deberían descontarse otra vez, desmarcar la casilla: el registro queda como **Solo estimación**, sin afectar inventario ni costos contabilizados.
-7. Confirmar el período. Consultar el historial compacto y expandir un registro para ver cantidades, costo orientativo y observaciones.
+1. Entrar en **Alimentación** y pulsar **Registrar alimentación**.
+2. Elegir el lote y las fechas desde/hasta. Se puede reconstruir una semana anterior a la incorporación de los DIIO.
+3. La frecuencia inicial es **2 suministros al día** para el lote completo. “Suministro” designa cada entrega de leche o concentrado; “toma” suele usarse específicamente para la leche.
+4. Seleccionar los insumos y escribir la **cantidad por suministro**, no por ternero. Opcionalmente usar presentaciones (sacos); SGIC convierte automáticamente a la unidad base.
+5. SGIC calcula la **cantidad total de cada insumo = cantidad por suministro × 2 × días inclusivos**. Ejemplo: 3 kg por suministro durante 7 días equivalen a 42 kg para ese lote. El costo se muestra como orientativo según el PMP.
+6. Si se desea repetir la combinación, un administrador puede usar **Guardar esta combinación como pauta reutilizable**. Otros usuarios pueden cargarla como base desde **Usar una pauta guardada**. Archivar una pauta conserva el historial.
+7. Mantener **Descontar del inventario al registrar** para descontar el total en una operación atómica y atribuir el costo al lote; desmarcarlo para una estimación histórica que no debe modificar stock ni rentabilidad.
+8. Confirmar y consultar en el historial el total del período y, en el detalle, la cantidad por suministro.
 
-El sistema impide **períodos solapados del mismo lote**, valida fechas (hasta el día actual) y evita superponer consumos manuales ya registrados. El registro utiliza una solicitud idempotente para evitar duplicar descuentos ante reintentos. **Los consumos son aproximados:** no se interpretan como mediciones diarias ni individuales. La tarea de descuento automático diario y la lógica anterior de planes fueron retiradas.
+Los cálculos se ejecutan de nuevo en PostgreSQL: el total no se acepta sin validación desde el navegador. La tarea automática diaria y las asignaciones del antiguo sistema de planes **no se han reactivado**. Se impiden períodos solapados y descuentos duplicados; un consumo estimado no se registra como costo contable.
 
 ### Tratamiento sanitario
 

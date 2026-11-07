@@ -5,7 +5,7 @@ import { AnimalSearch } from '../components/AnimalSearch'
 import { OperationConfirmDialog, type ConfirmDetails } from '../components/OperationConfirmDialog'
 import { parseClpAmount } from '../utils/clpInput'
 
-type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; lote_id?:number
+type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; lote_id?:number }
 type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
 export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','tratamiento']

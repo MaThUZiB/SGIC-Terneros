@@ -12,7 +12,7 @@ import { ProfitabilityReport } from './ProfitabilityReport'
 import { SupplyHistory } from './SupplyHistory'
 import type { PresentacionStock } from '../utils/presentationStock'
 import { SupplyOperations, supplyActions } from './SupplyOperations'
-import { PlansOverview } from './PlansOverview'
+import { FeedingPeriods } from './FeedingPeriods'
 import { PendingRequests } from './PendingRequests'
 import { SipecSyncPreview } from './SipecSyncPreview'
 import { SaleIndividualPrices } from './SaleIndividualPrices'
@@ -72,6 +72,8 @@ export function CloudWorkspacePage() {
   const [revision, setRevision] = useState(0)
   const [supplyNotice,setSupplyNotice]=useState<{module:'compras'|'inventario';message:string}|null>(null)
   const [seguimientoLoteId,setSeguimientoLoteId]=useState<number|null>(null)
+  const [buscarLotes,setBuscarLotes]=useState('')
+  const [mostrarTodosLotes,setMostrarTodosLotes]=useState(false)
 
   useEffect(() => {
     let vigente = true
@@ -139,10 +141,12 @@ export function CloudWorkspacePage() {
   const demo = (datos?.animales ?? []).some(a => a.diio.startsWith('DEMO-'))
   const animalesActivos = (datos?.animales ?? []).filter(a => a.estado === 'ACTIVO').length
   const faltantes = (datos?.productos ?? []).filter(p => Number(p.stock_actual) <= Number(p.stock_minimo)).length
+  const lotesFiltrados=(datos?.lotes??[]).filter(l=>l.codigo.toLocaleLowerCase('es').includes(buscarLotes.trim().toLocaleLowerCase('es')))
+  const lotesVisibles=mostrarTodosLotes?lotesFiltrados:lotesFiltrados.slice(0,12)
 
   const availableActions=getModuleActions(tab,esAdmin)
   const visibleActions=tab==='animales'&&esAdmin
-    ? [{id:'sipecSync',label:'Sincronizar con SIPECweb'},...availableActions]
+    ? [...availableActions,{id:'sipecSync',label:'Importar desde SIPECweb'}]
     : tab==='ventas'&&esAdmin
       ? [...availableActions,{id:'ventaIndividual',label:'Venta con precios por DIIO'}]
       : availableActions
@@ -187,27 +191,21 @@ export function CloudWorkspacePage() {
 
         {!error && datos && (
           <>
-            {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-4">
-              {tab!=='catalogos'&&tab!=='planes'&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3">
-                {visibleActions.slice(0,2).map((item,index)=><button type="button" key={item.id}
-                  onClick={()=>{operation===item.id?closeOperation():openOperation(item.id)}}
-                  aria-expanded={operation===item.id}
-                  className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition ${operation===item.id
-                    ?'border-emerald-900 bg-emerald-900 text-white'
-                    :index===0?'border-emerald-900 bg-emerald-900 text-white hover:bg-emerald-800'
-                    :'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
-                  {item.label}
-                </button>)}
-                {visibleActions.length>2&&<details className="min-w-0 max-w-full" open={visibleActions.slice(2).some(item=>item.id===operation)}>
-                  <summary className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Más acciones ({visibleActions.length-2})</summary>
-                  <div className="mt-2 flex max-w-full flex-wrap gap-2 rounded-lg bg-slate-50 p-2">
-                    {visibleActions.slice(2).map(item=><button type="button" key={item.id}
-                      aria-expanded={operation===item.id}
-                      onClick={()=>{operation===item.id?closeOperation():openOperation(item.id)}}
-                      className={`rounded-lg border px-3 py-2 text-sm ${operation===item.id?'border-emerald-800 bg-emerald-900 text-white':'border-slate-200 bg-white text-slate-700 hover:border-emerald-500'}`}>{item.label}</button>)}
+            {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-3">
+              {tab!=='catalogos'&&tab!=='planes'&&!operation&&<div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={()=>openOperation(visibleActions[0].id)}
+                  className="rounded-lg bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+                  + {visibleActions[0].label}
+                </button>
+                {visibleActions.length>1&&<details>
+                  <summary className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700">Otras acciones</summary>
+                  <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+                    {visibleActions.slice(1).map(item=><button type="button" key={item.id}
+                      onClick={()=>openOperation(item.id)} className="rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">{item.label}</button>)}
                   </div>
                 </details>}
               </div>}
+              {operation&&<button type="button" onClick={closeOperation} className="text-sm font-medium text-emerald-800 hover:underline">← Volver a {moduleTitles[tab]}</button>}
               {operation==='sipecSync'&&tab==='animales'&&esAdmin&&
                 <SipecSyncPreview onClose={closeOperation} onChanged={()=>setRevision(x=>x+1)} onNavigate={abrirModulo}/>}
               {operation==='ventaIndividual'&&tab==='ventas'&&esAdmin&&
@@ -222,19 +220,24 @@ export function CloudWorkspacePage() {
             {tab==='inventario'&&<SupplyHistory revision={revision}/>}
             {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
             {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <PlansOverview key={revision} esAdmin={esAdmin} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId}
-               onCreatePlan={()=>openOperation('catalogo')} onAddFood={()=>openOperation('planDetalle')} onViewTracking={closeOperation} />}
+            {tab === 'planes' && <FeedingPeriods key={revision} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId} />}
             {tab === 'usuarios' && esAdmin && <UserManagement />}
             {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
             {tab === 'resumen' && (
               <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Identificados por DIIO" onClick={()=>abrirModulo("animales","ACTIVO")} />
-                  <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Agrupaciones operativas" onClick={()=>abrirModulo("lotes")} />
-                  <Indicador nombre="Valor base del ganado activo" valor={formatoDinero(adquisiciones)} nota="Adquisición de animales activos" onClick={()=>abrirModulo("compras")} />
-                  <Indicador nombre="Bajas por fallecimiento" valor={formatoDinero(bajas)} nota="Valor de adquisición · separado del ganado activo" onClick={()=>abrirModulo("animales","FALLECIDO")} />
-                  <Indicador nombre="Valor del stock" valor={formatoDinero(valorStock)} nota="Existencia × costo promedio" onClick={()=>abrirModulo("inventario")} />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Ver animales" onClick={()=>abrirModulo("animales","ACTIVO")} />
+                  <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Ver lotes" onClick={()=>abrirModulo("lotes")} />
+                  <Indicador nombre="Alertas de stock" valor={String(faltantes)} nota="Ver inventario" onClick={()=>abrirModulo("inventario")} />
                 </div>
+                <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                  <summary className="cursor-pointer font-medium text-slate-700">Indicadores de valoración</summary>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <Indicador nombre="Ganado activo" valor={formatoDinero(adquisiciones)} nota="Valor de adquisición" onClick={()=>abrirModulo("compras")} />
+                    <Indicador nombre="Bajas por fallecimiento" valor={formatoDinero(bajas)} nota="Valor de adquisición" onClick={()=>abrirModulo("animales","FALLECIDO")} />
+                    <Indicador nombre="Existencias" valor={formatoDinero(valorStock)} nota="Costo promedio" onClick={()=>abrirModulo("inventario")} />
+                  </div>
+                </details>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <section className="rounded-xl border border-slate-200 bg-white p-4">
                     <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Lotes</h2><button type="button" onClick={()=>abrirModulo('lotes')} className="text-xs font-medium text-emerald-800 hover:underline">Ver todos</button></div>
@@ -264,18 +267,24 @@ export function CloudWorkspacePage() {
               </div>
             )}
 
-            {tab==='lotes' && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="mb-3 text-base font-semibold">Lotes <span className="text-sm font-normal text-slate-500">({datos.lotes.length})</span></h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {datos.lotes.map(l=><article key={l.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex justify-between gap-3"><strong>{l.codigo}</strong><Estado valor={l.estado}/></div>
-                  <p className="mt-2 text-xl font-semibold tabular-nums">{formatoCantidad(l.cantidad_actual)} <span className="text-xs font-normal text-slate-500">animales</span></p>
-                  <button type="button" onClick={()=>abrirModulo('animales','TODOS',l.codigo)}
-                    className="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Ver animales →</button>
-                  <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="mt-3 block text-sm font-semibold text-emerald-700 hover:underline">Seguimiento →</button>
-                </article>)}
-                {datos.lotes.length===0&&<TablaVacia texto="Todavía no se han creado lotes."/>}
+            {tab==='lotes' && <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold">Lotes <span className="font-normal text-slate-500">({lotesFiltrados.length})</span></h2>
+                <input type="search" value={buscarLotes} onChange={e=>{setBuscarLotes(e.target.value);setMostrarTodosLotes(false)}}
+                  placeholder="Buscar lote" aria-label="Buscar lote" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm sm:w-56"/>
               </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {lotesVisibles.map(l=><article key={l.id} className="rounded-lg border border-slate-200 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2"><strong className="text-sm">{l.codigo}</strong><Estado valor={l.estado}/></div>
+                  <p className="mt-1 text-sm text-slate-600">{formatoCantidad(l.cantidad_actual)} animales</p>
+                  <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
+                    <button type="button" onClick={()=>abrirModulo('animales','TODOS',l.codigo)} className="text-emerald-800 hover:underline">Ver animales</button>
+                    <button type="button" onClick={()=>{setSeguimientoLoteId(l.id);abrirModulo('planes')}} className="text-slate-600 hover:underline">Consumos</button>
+                  </div>
+                </article>)}
+                {lotesFiltrados.length===0&&<TablaVacia texto="No se encontraron lotes."/>}
+              </div>
+              {!mostrarTodosLotes&&lotesFiltrados.length>12&&<button type="button" className="mt-4 text-sm font-medium text-emerald-800 hover:underline" onClick={()=>setMostrarTodosLotes(true)}>Mostrar los {lotesFiltrados.length} lotes</button>}
             </section>}
             {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id}
               animal={fichaAnimal} raza={razasPorId.get(fichaAnimal.raza_id)??'Sin raza'} lote={lotesPorId.get(fichaAnimal.lote_id)??'Sin lote'}

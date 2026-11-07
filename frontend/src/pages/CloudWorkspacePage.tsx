@@ -230,7 +230,7 @@ export function CloudWorkspacePage() {
                   <Indicador nombre="Lotes activos" valor={String(datos.lotes.filter(l => l.estado === 'ACTIVO').length)} nota="Ver lotes" onClick={()=>abrirModulo("lotes")} />
                   <Indicador nombre="Alertas de stock" valor={String(faltantes)} nota="Ver inventario" onClick={()=>abrirModulo("inventario")} />
                 </div>
-                <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                <details open className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
                   <summary className="cursor-pointer font-medium text-slate-700">Indicadores de valoración</summary>
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
                     <Indicador nombre="Ganado activo" valor={formatoDinero(adquisiciones)} nota="Valor de adquisición" onClick={()=>abrirModulo("compras")} />

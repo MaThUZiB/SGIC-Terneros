@@ -216,14 +216,14 @@ export function CloudWorkspacePage() {
                   esAdmin={esAdmin} onChanged={()=>setRevision(x=>x+1)} onClose={closeOperation}/>}
             </section>}
             {tab==='catalogos'&&esAdmin&&!operation&&<CatalogOverview onCreate={type=>openOperation('catalogo',type)}/>}
-            {(tab==='ventas'||tab==='sanidad'||tab==='gastos')&&<DomainRecords module={tab} revision={revision}/>}
-            {tab==='inventario'&&<SupplyHistory revision={revision}/>}
-            {tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
-            {tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
-            {tab === 'planes' && <FeedingPeriods key={revision} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId} />}
-            {tab === 'usuarios' && esAdmin && <UserManagement />}
-            {tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
-            {tab === 'resumen' && (
+            {!operation&&(tab==='ventas'||tab==='sanidad'||tab==='gastos')&&<DomainRecords module={tab} revision={revision}/>}
+            {!operation&&tab==='inventario'&&<SupplyHistory revision={revision}/>}
+            {!operation&&tab === 'historial' && <OperationsHistory esAdmin={esAdmin} />}
+            {!operation&&tab === 'pendientes' && <PendingRequests esAdmin={esAdmin} onChanged={() => setRevision(x => x + 1)} />}
+            {!operation&&tab === 'planes' && <FeedingPeriods key={revision} initialLoteId={seguimientoLoteId} onSelectLote={setSeguimientoLoteId} />}
+            {!operation&&tab === 'usuarios' && esAdmin && <UserManagement />}
+            {!operation&&tab === 'rentabilidad' && <ProfitabilityReport bajasPorLote={(datos?.animales??[]).filter(a=>a.estado==='FALLECIDO').reduce<Record<number,number>>((totals,a)=>{totals[a.lote_id]=(totals[a.lote_id]??0)+Number(a.precio_adquisicion);return totals},{})}/>}
+            {!operation&&tab === 'resumen' && (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Indicador nombre="Animales activos" valor={formatoCantidad(animalesActivos)} nota="Ver animales" onClick={()=>abrirModulo("animales","ACTIVO")} />
@@ -267,7 +267,7 @@ export function CloudWorkspacePage() {
               </div>
             )}
 
-            {tab==='lotes' && <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            {!operation&&tab==='lotes' && <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">Lotes <span className="font-normal text-slate-500">({lotesFiltrados.length})</span></h2>
                 <input type="search" value={buscarLotes} onChange={e=>{setBuscarLotes(e.target.value);setMostrarTodosLotes(false)}}
@@ -289,11 +289,11 @@ export function CloudWorkspacePage() {
             {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id}
               animal={fichaAnimal} raza={razasPorId.get(fichaAnimal.raza_id)??'Sin raza'} lote={lotesPorId.get(fichaAnimal.lote_id)??'Sin lote'}
               esAdmin={esAdmin} action={animalCard.action??null} onAction={setAnimalAction} onClose={closeAnimal} onChanged={()=>setRevision(x=>x+1)}/>}
-            {(tab==='inventario'||(tab==='animales'&&!animalCard))&&<PaginatedRegistry key={tab}
+            {!operation&&(tab==='inventario'||(tab==='animales'&&!animalCard))&&<PaginatedRegistry key={tab}
               type={tab} search={buscar} filter={filtroAnimal} onFilter={setFiltroAnimal} onSearch={setBuscar}
               onOpenAnimal={openAnimal} revision={revision} presentaciones={datos.presentaciones}/>}
             
-            {tab==='compras'&&<PurchasesRegistry revision={revision}
+            {!operation&&tab==='compras'&&<PurchasesRegistry revision={revision}
               providers={datos.proveedores} products={datos.productos} animals={datos.animales}
               onPending={()=>abrirModulo('pendientes')}/>}
           </>

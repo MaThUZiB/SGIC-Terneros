@@ -196,15 +196,15 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
 
   return <section className="space-y-4" aria-label="Consumo de alimentación por período">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-base font-semibold">Consumos por período</h2>
-        <p className="mt-1 text-xs text-slate-500">Totales aproximados por lote, sin cálculos automáticos por animal ni por jornada.</p>
+      <div><h2 className="text-base font-semibold">Alimentación por suministros</h2>
+        <p className="mt-1 text-xs text-slate-500">Indica cuánto recibe el lote en cada suministro; SGIC calcula el consumo acumulado por fechas.</p>
       </div>
-      {!nuevo&&<button type="button" onClick={()=>{setNuevo(true);setAviso('');setError('');setLoteId(filtroLote)}} className="rounded-lg bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white">+ Registrar período</button>}
+      {!nuevo&&<button type="button" onClick={()=>{setNuevo(true);setAviso('');setError('');setLoteId(filtroLote)}} className="rounded-lg bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white">+ Registrar alimentación</button>}
     </div>
     {error&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
     {aviso&&<p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{aviso}</p>}
     {nuevo&&<div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-base font-semibold">Nuevo período</h3>
+      <div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-base font-semibold">Nuevo período de alimentación</h3>
         <button type="button" onClick={()=>{setNuevo(false);setError('')}} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">Cancelar</button></div>
       <form onSubmit={e=>{e.preventDefault();preparar()}} className="mx-auto max-w-3xl space-y-5">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -220,9 +220,20 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
             <input className={field} type="date" max={hoy()} required value={fin} onChange={e=>setFin(e.target.value)}/>
           </label>
         </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">{SUMINISTROS_DIARIOS} suministros diarios para el lote</p>
+          <p className="mt-1 text-xs text-slate-600">Cantidad por suministro × {SUMINISTROS_DIARIOS} × {cantidadDias||'—'} días = consumo total estimado. No se exige ingresar los terneros individualmente.</p>
+        </div>
+        {pautas.some(p=>p.activo&&p.suministros_dia===SUMINISTROS_DIARIOS)&&<label className="block space-y-1 text-sm">
+          <span className="font-medium">Usar una pauta guardada (opcional)</span>
+          <select className={field} value={pautaId} onChange={e=>aplicarPauta(e.target.value)}>
+            <option value="">Crear sin pauta</option>
+            {pautas.filter(p=>p.activo&&p.suministros_dia===SUMINISTROS_DIARIOS).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+        </label>}
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold">Alimentos consumidos durante el período</h4>
-            <button type="button" disabled={lineas.length>=20} onClick={()=>setLineas(old=>[...old,nuevaLinea()])} className="text-xs font-semibold text-emerald-800 disabled:opacity-50">+ Añadir insumo</button>
+          <div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold">Cantidad por suministro (lote completo)</h4>
+            <button type="button" disabled={lineas.length>=20} onClick={()=>{setPautaId('');setLineas(old=>[...old,nuevaLinea()])}} className="text-xs font-semibold text-emerald-800 disabled:opacity-50">+ Añadir insumo</button>
           </div>
           {calculadas.map(({linea,producto,total},index)=><div key={linea.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_auto] sm:items-end">
@@ -237,15 +248,30 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
                   {presentaciones.filter(pr=>String(pr.producto_id)===linea.producto_id).map(pr=><option value={pr.id} key={pr.id}>{pr.nombre} ({numero(Number(pr.cantidad_base))} {unidad(producto)})</option>)}
                 </select>
               </label>
-              <label className="space-y-1 text-sm"><span className="text-xs font-medium">Cantidad</span>
+              <label className="space-y-1 text-sm"><span className="text-xs font-medium">Por suministro</span>
                 <input className={field} required inputMode="decimal" placeholder="0" value={linea.cantidad} onChange={e=>cambiarLinea(linea.key,{cantidad:e.target.value})}/>
               </label>
-              <button type="button" title="Quitar insumo" aria-label="Quitar insumo" disabled={lineas.length===1} onClick={()=>setLineas(old=>old.filter(l=>l.key!==linea.key))}
+              <button type="button" title="Quitar insumo" aria-label="Quitar insumo" disabled={lineas.length===1} onClick={()=>{setPautaId('');setLineas(old=>old.filter(l=>l.key!==linea.key))}}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 disabled:opacity-30">Quitar</button>
             </div>
-            {producto&&Number.isFinite(total)&&total>0&&<p className="mt-2 text-xs text-slate-600">Total del período: {numero(total)} {unidad(producto)} · Stock disponible: {numero(Number(producto.stock_actual))} {unidad(producto)}</p>}
+            {producto&&Number.isFinite(total)&&total>0&&<p className="mt-2 text-xs text-slate-600">
+              {numero(redondear(asNumber(linea.cantidad)*factor(linea)))} {unidad(producto)} × {SUMINISTROS_DIARIOS} suministros × {cantidadDias} días = <strong>{numero(total)} {unidad(producto)} en el período</strong>
+              <span className="block mt-1">Stock disponible: {numero(Number(producto.stock_actual))} {unidad(producto)}</span>
+            </p>}
           </div>)}
         </div>
+        {esAdmin&&<details className="rounded-lg border border-slate-200 px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-medium">Guardar esta combinación como pauta reutilizable</summary>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input type="text" maxLength={100} className={field} value={nombrePauta}
+              onChange={e=>setNombrePauta(e.target.value)} placeholder="Ej. Alimentación de inicio"/>
+            <button type="button" disabled={guardandoPauta||cargando} onClick={()=>{void guardarPauta()}}
+              className="shrink-0 rounded-lg border border-emerald-900 px-4 py-2 text-sm font-semibold text-emerald-900 disabled:opacity-50">
+              {guardandoPauta?'Guardando…':'Guardar pauta'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">La pauta solo guarda las cantidades por suministro para reutilizarlas. No genera consumos ni descuenta inventario por sí sola.</p>
+        </details>}
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm">
           <input type="checkbox" checked={descontar} onChange={e=>setDescontar(e.target.checked)} className="mt-1 accent-emerald-900"/>
           <span><strong>Descontar del inventario al registrar</strong>
@@ -256,11 +282,28 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
           <textarea className={field+' mt-3'} maxLength={500} rows={2} value={observaciones} onChange={e=>setObservaciones(e.target.value)} placeholder="Ej. consumo reconstruido de la semana de llegada"/>
         </details>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-sm text-slate-600">{inicio&&fin&&inicio<=fin?dias(inicio,fin)+' días · ':''}Costo orientativo: <strong>{clp(calculadas.reduce((s,x)=>s+(Number.isFinite(x.costo)?x.costo:0),0))}</strong></p>
+          <p className="text-sm text-slate-600">{cantidadDias>0?cantidadDias+' días · '+(cantidadDias*SUMINISTROS_DIARIOS)+' suministros · ':''}Costo orientativo: <strong>{clp(calculadas.reduce((s,x)=>s+(Number.isFinite(x.costo)?x.costo:0),0))}</strong></p>
           <button type="submit" disabled={guardando||cargando} className="rounded-lg bg-emerald-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Revisar período</button>
         </div>
       </form>
     </div>}
+    {pautas.some(p=>p.activo)&&<details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <summary className="cursor-pointer text-sm font-semibold">Pautas de alimentación guardadas ({pautas.filter(p=>p.activo).length})</summary>
+      <div className="mt-3 divide-y divide-slate-100">
+        {pautas.filter(p=>p.activo).map(p=><div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div><p className="text-sm font-medium">{p.nombre}</p><p className="mt-0.5 text-xs text-slate-500">
+            {p.suministros_dia} suministros/día · {p.detalles.length} insumo(s)
+          </p></div>
+          <div className="flex gap-3">
+            <button type="button" disabled={p.suministros_dia!==SUMINISTROS_DIARIOS}
+              onClick={()=>{setNuevo(true);aplicarPauta(String(p.id));setLoteId(filtroLote);setError('');setAviso('')}}
+              className="text-sm font-semibold text-emerald-800 disabled:opacity-50">Usar pauta</button>
+            {esAdmin&&<button type="button" disabled={pautaArchivo!==null} onClick={()=>{void archivarPauta(p.id)}}
+              className="text-sm text-slate-500 hover:text-rose-700 disabled:opacity-50">Archivar</button>}
+          </div>
+        </div>)}
+      </div>
+    </details>}
     <div className="rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
         <h3 className="text-sm font-semibold">Historial de períodos <span className="font-normal text-slate-500">({visibles.length})</span></h3>
@@ -277,14 +320,14 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
           <button type="button" aria-expanded={seleccion===p.id} onClick={()=>setSeleccion(s=>s===p.id?null:p.id)}
             className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50">
             <span><strong className="text-sm">{nombreLote(p.lote_id)}</strong>
-              <span className="mt-1 block text-xs text-slate-500">{fecha(p.fecha_inicio)} — {fecha(p.fecha_fin)} · {dias(p.fecha_inicio,p.fecha_fin)} días</span>
+              <span className="mt-1 block text-xs text-slate-500">{fecha(p.fecha_inicio)} — {fecha(p.fecha_fin)} · {dias(p.fecha_inicio,p.fecha_fin)} días · {p.suministros_dia} suministros/día</span>
             </span>
             <span className="flex items-center gap-3"><span className="text-right"><strong className="block text-sm">{clp(costo(p.id))}</strong><small className="text-xs text-slate-500">{p.estado==='DESCONTADO'?'Stock descontado':'Solo estimación'}</small></span><span className="text-slate-500">{seleccion===p.id?'−':'+'}</span></span>
           </button>
           {detalleSeleccionado?.id===p.id&&<div className="border-t border-slate-100 bg-slate-50 px-4 py-4">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Detalle del período</h4>
             <div className="mt-3 space-y-2">{seleccionDetalles.map(d=><div key={d.id} className="flex flex-wrap justify-between gap-2 text-sm">
-              <span>{nombreProducto(d.producto_id)}</span><span className="font-medium">{numero(Number(d.cantidad_total))} {unidad(productos.find(x=>x.id===d.producto_id))}</span>
+              <span>{nombreProducto(d.producto_id)}{d.cantidad_por_suministro!==null&&<small className="mt-1 block text-slate-500">{numero(Number(d.cantidad_por_suministro))} {unidad(productos.find(x=>x.id===d.producto_id))} por suministro</small>}</span><span className="font-medium">{numero(Number(d.cantidad_total))} {unidad(productos.find(x=>x.id===d.producto_id))} total</span>
             </div>)}</div>
             {p.observaciones&&<p className="mt-3 text-xs text-slate-600">{p.observaciones}</p>}
             <p className="mt-3 text-xs text-slate-500">Cantidades globales aproximadas. No representan una medición individual ni un registro diario.</p>

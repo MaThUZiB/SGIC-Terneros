@@ -4,7 +4,7 @@
 
 El archivo [demo_20261012.sql](./demo_20261012.sql) contiene únicamente datos **ficticios**. Se instaló en el proyecto de desarrollo de Supabase el 12/10/2026 para verificar el modelo de datos y la interfaz. No representa animales, proveedores, compras o gastos reales de una empresa.
 
-La carga incluye 18 animales con DIIO que comienza en `DEMO-`, dos lotes, dos proveedores ficticios, seis productos, dos compras de animales, una compra de insumos en **BORRADOR**, y dos planes de consumo. No inventa movimientos confirmados ni ingresos de venta. Los precios y pesos son ejemplos.
+La carga incluye 18 animales con DIIO que comienza en `DEMO-`, dos lotes, dos proveedores ficticios, seis productos, dos compras de animales, una compra de insumos en **BORRADOR**. Los consumos por período se registran separadamente por usuarios autorizados, no como parte de la semilla. No inventa movimientos confirmados ni ingresos de venta. Los precios y pesos son ejemplos.
 
 El script cancela toda la transacción si detecta registros previos en entidades clave, para evitar contaminar una instalación con datos existentes. **No volver a ejecutarlo sobre un proyecto con información operativa**.
 

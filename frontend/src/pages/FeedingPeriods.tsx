@@ -6,9 +6,11 @@ type Lote = { id:number; codigo:string; estado:string }
 type Insumo = { id:number; nombre:string; tipo_insumo:string; unidad_base_id:number; stock_actual:number; costo_promedio:number }
 type Unidad = { id:number; codigo:string }
 type Presentacion = { id:number; producto_id:number; nombre:string; cantidad_base:number; activa:boolean }
-type Periodo = { id:number; lote_id:number; fecha_inicio:string; fecha_fin:string; estado:'ESTIMADO'|'DESCONTADO'; observaciones:string|null; creado_en:string }
-type Detalle = { id:number; periodo_id:number; producto_id:number; cantidad_total:number; costo_referencia:number }
+type Periodo = { id:number; lote_id:number; fecha_inicio:string; fecha_fin:string; suministros_dia:number; pauta_id:number|null; estado:'ESTIMADO'|'DESCONTADO'; observaciones:string|null; creado_en:string }
+type Detalle = { id:number; periodo_id:number; producto_id:number; cantidad_por_suministro:number|null; cantidad_total:number; costo_referencia:number }
 type Linea = { key:string; producto_id:string; cantidad:string; presentacion_id:string }
+type Pauta = { id:number; nombre:string; suministros_dia:number; detalles:{producto_id:number;cantidad_por_suministro:number}[]; activo:boolean }
+const SUMINISTROS_DIARIOS=2
 
 const hoy=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'})
 function haceDias(dias:number) {
@@ -22,9 +24,11 @@ const numero=(value:number)=>new Intl.NumberFormat('es-CL',{maximumFractionDigit
 const fecha=(value:string)=>value.split('-').reverse().join('/')
 const field='w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100'
 const asNumber=(value:string)=>Number(value.replace(',','.'))
+const dias=(start:string,end:string)=>Math.round((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)+1
+const redondear=(n:number)=>Math.round((n+Number.EPSILON)*1000)/1000
 
-export function FeedingPeriods({initialLoteId,onSelectLote}:{
-  initialLoteId?:number|null; onSelectLote?:(loteId:number|null)=>void
+export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
+  initialLoteId?:number|null; onSelectLote?:(loteId:number|null)=>void; esAdmin:boolean
 }) {
   const [lotes,setLotes]=useState<Lote[]>([])
   const [productos,setProductos]=useState<Insumo[]>([])
@@ -32,6 +36,11 @@ export function FeedingPeriods({initialLoteId,onSelectLote}:{
   const [presentaciones,setPresentaciones]=useState<Presentacion[]>([])
   const [periodos,setPeriodos]=useState<Periodo[]>([])
   const [detalles,setDetalles]=useState<Detalle[]>([])
+  const [pautas,setPautas]=useState<Pauta[]>([])
+  const [pautaId,setPautaId]=useState('')
+  const [nombrePauta,setNombrePauta]=useState('')
+  const [guardandoPauta,setGuardandoPauta]=useState(false)
+  const [pautaArchivo,setPautaArchivo]=useState<number|null>(null)
   const [filtroLote,setFiltroLote]=useState(String(initialLoteId??''))
   const [nuevo,setNuevo]=useState(false)
   const [seleccion,setSeleccion]=useState<number|null>(null)
@@ -57,9 +66,10 @@ export function FeedingPeriods({initialLoteId,onSelectLote}:{
         .in('tipo_insumo',['LECHE','CONCENTRADO']).eq('activo',true).order('nombre').limit(2000),
       supabase.from('unidad_medida').select('id,codigo').limit(1000),
       supabase.from('presentacion_producto').select('id,producto_id,nombre,cantidad_base,activa').eq('activa',true).limit(2000),
-      supabase.from('periodo_alimentacion').select('id,lote_id,fecha_inicio,fecha_fin,estado,observaciones,creado_en')
+      supabase.from('periodo_alimentacion').select('id,lote_id,fecha_inicio,fecha_fin,suministros_dia,pauta_id,estado,observaciones,creado_en')
         .order('fecha_fin',{ascending:false}).order('id',{ascending:false}).limit(2000),
-      supabase.from('detalle_periodo_alimentacion').select('id,periodo_id,producto_id,cantidad_total,costo_referencia').limit(10000)
+      supabase.from('detalle_periodo_alimentacion').select('id,periodo_id,producto_id,cantidad_por_suministro,cantidad_total,costo_referencia').limit(10000),
+      supabase.from('pauta_alimentacion').select('id,nombre,suministros_dia,detalles,activo').order('nombre').limit(300)
     ])
     const failed=result.find(r=>r.error)
     if(failed?.error){setError('No se pudo consultar Alimentación: '+failed.error.message)}
@@ -70,6 +80,7 @@ export function FeedingPeriods({initialLoteId,onSelectLote}:{
       setPresentaciones((result[3].data??[]) as Presentacion[])
       setPeriodos((result[4].data??[]) as Periodo[])
       setDetalles((result[5].data??[]) as Detalle[])
+      setPautas((result[6].data??[]) as Pauta[])
       setError('')
     }
     setCargando(false)
@@ -82,37 +93,82 @@ export function FeedingPeriods({initialLoteId,onSelectLote}:{
     const presentation=presentaciones.find(pr=>String(pr.id)===linea.presentacion_id&&String(pr.producto_id)===linea.producto_id)
     return presentation?Number(presentation.cantidad_base):1
   }
+  const cantidadDias=inicio&&fin&&inicio<=fin?dias(inicio,fin):0
   const calculadas=useMemo(()=>lineas.map(linea=>{
     const producto=productos.find(p=>String(p.id)===linea.producto_id)
-    const total=Math.round(asNumber(linea.cantidad)*factor(linea)*1000)/1000
-    return {linea,producto,total,costo:producto?total*Number(producto.costo_promedio):0}
-  }),[lineas,productos,presentaciones])
+    const base=asNumber(linea.cantidad)*factor(linea)
+    const porSuministro=redondear(base)
+    const total=redondear(porSuministro*SUMINISTROS_DIARIOS*cantidadDias)
+    return {linea,producto,base,porSuministro,total,costo:producto?total*Number(producto.costo_promedio):0}
+  }),[lineas,productos,presentaciones,cantidadDias])
   const visibles=periodos.filter(p=>!filtroLote||String(p.lote_id)===filtroLote)
   const detalleSeleccionado=seleccion===null?null:periodos.find(p=>p.id===seleccion)??null
   const seleccionDetalles=detalles.filter(d=>d.periodo_id===seleccion)
   const nombreLote=(id:number)=>lotes.find(l=>l.id===id)?.codigo??'Lote #'+id
   const nombreProducto=(id:number)=>productos.find(p=>p.id===id)?.nombre??'Insumo #'+id
   const costo=(id:number)=>detalles.filter(d=>d.periodo_id===id).reduce((total,d)=>total+Number(d.costo_referencia),0)
-  const dias=(start:string,end:string)=>Math.round((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)+1
 
   function cambiarLinea(key:string,patch:Partial<Linea>){
+    setPautaId('')
     setLineas(prev=>prev.map(l=>l.key===key?{...l,...patch}:l))
+  }
+  function aplicarPauta(id:string){
+    setPautaId(id)
+    const pauta=pautas.find(p=>String(p.id)===id&&p.activo&&p.suministros_dia===SUMINISTROS_DIARIOS)
+    if(!pauta)return
+    setLineas(pauta.detalles.map(d=>({key:crypto.randomUUID(),producto_id:String(d.producto_id),cantidad:String(d.cantidad_por_suministro),presentacion_id:''})))
+    setError('')
+  }
+  function validarLineas():string|null {
+    if(lineas.length===0||calculadas.some(({linea,producto,base,porSuministro})=>!linea.producto_id||!producto||!Number.isFinite(base)||base<=0||porSuministro<=0||Math.abs(base-porSuministro)>0.000001))
+      return 'Ingresa cantidades positivas por suministro, con hasta tres decimales en la unidad base.'
+    if(new Set(lineas.map(l=>l.producto_id)).size!==lineas.length)
+      return 'Cada insumo solo puede agregarse una vez a la pauta.'
+    return null
+  }
+  async function guardarPauta() {
+    if(!supabase||guardandoPauta)return
+    const problema=validarLineas()
+    if(problema){setError(problema);return}
+    if(nombrePauta.trim().length<3){setError('Escribe un nombre de pauta de al menos tres caracteres.');return}
+    setGuardandoPauta(true);setError('');setAviso('')
+    try{
+      const result=await supabase.rpc('sgic_guardar_pauta_alimentacion',{
+        p:{nombre:nombrePauta.trim(),suministros_dia:SUMINISTROS_DIARIOS,
+          detalles:calculadas.map(x=>({producto_id:x.producto!.id,cantidad_por_suministro:x.porSuministro}))}
+      })
+      if(result.error)throw Error(result.error.message)
+      setPautaId(String(result.data));setNombrePauta('')
+      setAviso('Pauta guardada. Puedes reutilizarla en otros lotes o períodos sin generar consumos automáticamente.')
+      await cargar()
+    }catch(e){setError(e instanceof Error?e.message:'No se pudo guardar la pauta.')}
+    finally{setGuardandoPauta(false)}
+  }
+  async function archivarPauta(id:number) {
+    if(!supabase||!esAdmin||pautaArchivo!==null)return
+    setPautaArchivo(id);setError('')
+    try{
+      const result=await supabase.rpc('sgic_archivar_pauta_alimentacion',{p_id:id})
+      if(result.error)throw Error(result.error.message)
+      if(pautaId===String(id))setPautaId('')
+      setAviso('Pauta archivada. Los consumos históricos permanecen intactos.')
+      await cargar()
+    }catch(e){setError(e instanceof Error?e.message:'No se pudo archivar la pauta.')}
+    finally{setPautaArchivo(null)}
   }
   function preparar(){
     setError('');setAviso('')
     if(!loteId||!lotes.some(l=>String(l.id)===loteId)){setError('Selecciona un lote.');return}
     if(!inicio||!fin||inicio>fin||fin>hoy()||dias(inicio,fin)>366){setError('Revisa las fechas. El período no puede terminar en el futuro ni superar 366 días.');return}
-    if(lineas.length===0||calculadas.some(({linea,producto,total})=>!linea.producto_id||!producto||!Number.isFinite(total)||total<=0||Math.abs(total-asNumber(linea.cantidad)*factor(linea))>0.00001)){
-      setError('Selecciona los insumos e ingresa cantidades positivas de hasta tres decimales en la unidad base.');return
-    }
-    if(new Set(lineas.map(l=>l.producto_id)).size!==lineas.length){setError('Un mismo insumo solo puede agregarse una vez por período.');return}
+    const problema=validarLineas()
+    if(problema){setError(problema);return}
     if(descontar&&calculadas.some(x=>x.producto&&x.total>Number(x.producto.stock_actual))){
       setError('No existe stock suficiente para descontar todos los insumos. Para reconstruir semanas antiguas, puedes guardar solamente una estimación.');return
     }
-    const resumen=calculadas.map(x=>x.producto?.nombre+': '+numero(x.total)+' '+unidad(x.producto)).join('\n')
+    const resumen=calculadas.map(x=>x.producto?.nombre+': '+numero(x.porSuministro)+' '+unidad(x.producto)+' por suministro → '+numero(x.total)+' '+unidad(x.producto)+' total').join('\n')
     setConfirmacion({
       title:descontar?'Confirmar consumo y descontar inventario':'Guardar estimación histórica',
-      description:nombreLote(Number(loteId))+' · '+fecha(inicio)+' al '+fecha(fin)+'\n'+resumen+
+      description:nombreLote(Number(loteId))+' · '+fecha(inicio)+' al '+fecha(fin)+' · '+cantidadDias+' días × '+SUMINISTROS_DIARIOS+' suministros diarios\n'+resumen+
         (descontar?'\nSe descontará el stock una sola vez, no diariamente.':'\nNo se modificarán existencias ni rentabilidad contabilizada.'),
       confirmLabel:descontar?'Registrar consumo':'Guardar estimación',
       summary:[{label:'Total referencial',value:clp(calculadas.reduce((s,x)=>s+x.costo,0)),emphasis:true}]
@@ -123,14 +179,15 @@ export function FeedingPeriods({initialLoteId,onSelectLote}:{
     setGuardando(true)
     const payload={
       solicitud,lote_id:Number(loteId),fecha_inicio:inicio,fecha_fin:fin,
+      suministros_dia:SUMINISTROS_DIARIOS,pauta_id:pautaId?Number(pautaId):null,
       descontar_stock:descontar,observaciones:observaciones.trim(),
-      detalles:calculadas.map(x=>({producto_id:x.producto!.id,cantidad:x.total}))
+      detalles:calculadas.map(x=>({producto_id:x.producto!.id,cantidad_por_suministro:x.porSuministro}))
     }
     try{
       const result=await supabase.rpc('sgic_registrar_periodo_alimentacion',{p:payload})
       if(result.error)throw Error(result.error.message)
       setConfirmacion(null);setNuevo(false);setSeleccion(Number(result.data))
-      setSolicitud(crypto.randomUUID());setLineas([nuevaLinea()]);setObservaciones('')
+      setSolicitud(crypto.randomUUID());setLineas([nuevaLinea()]);setObservaciones('');setPautaId('')
       setAviso(descontar?'Consumo registrado. El stock y los costos del lote fueron actualizados.':'Estimación guardada sin descontar inventario.')
       await cargar()
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el período.')}

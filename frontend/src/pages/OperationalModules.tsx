@@ -17,7 +17,6 @@ const S: Record<string, Spec> = {
   ingresoInsumo:{title:'Ingresar insumos',role:'ADMIN',fields:[],help:''},
   usoInsumo:{title:'Registrar uso',role:'TODOS',fields:[],help:''},
   perdidaInsumo:{title:'Registrar pérdida',role:'TODOS',fields:[],help:''},
-  configInsumo:{title:'Uso en planes',role:'ADMIN',fields:[],help:''},
   compraAnimal: { title:'Compra / ingreso de ternero',role:'ADMIN',help:'DIIO único. Para agregar a lote existente, deja vacío el código de lote nuevo.',
     fields:[F('lote_id','Lote existente (opcional)','lote',undefined,true),F('lote_codigo','Código de lote nuevo',undefined,'text',true),F('proveedor_id','Proveedor','proveedor',undefined,true),
       F('diio','DIIO'),F('raza_id','Raza','raza'),F('sexo','Sexo','sexo'),F('edad','Edad aproximada (días)',undefined,'number'),F('precio','Costo adquisición (CLP)',undefined,'number'),F('peso','Peso inicial (kg)',undefined,'number',true),F('fecha','Fecha',undefined,'date')] },
@@ -391,12 +390,12 @@ const views:Record<string,string[]> = {
   presentacion_producto:['producto_id','nombre','cantidad_base','activa'],
   conversion_producto:['producto_id','unidad_origen_id','cantidad_origen','unidad_destino_id','cantidad_destino','activa'],
   consumo:['fecha','lote_id','origen'],
+  periodo_alimentacion:['lote_id','fecha_inicio','fecha_fin','estado'],
+  detalle_periodo_alimentacion:['periodo_id','producto_id','cantidad_total','costo_referencia'],
   tratamiento:['fecha','animal_id','motivo','costo_total'],
   gasto:['fecha','nombre','monto','lote_id'],
   venta:['fecha','comprador','estado','total_venta'],
   detalle_venta:['venta_id','lote_id','cantidad_animales','ingreso','costo_reconocido','utilidad'],
-  plan_consumo:['nombre','activo'],
-  asignacion_plan_lote:['lote_id','plan_id','fecha_inicio','activo'],
   registro_auditoria:['fecha_hora','accion','modelo','objeto_id'],
 }
 export function OperationsHistory({esAdmin}:{esAdmin:boolean}){

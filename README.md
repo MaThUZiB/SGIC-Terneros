@@ -63,7 +63,9 @@ La exportación XLS se procesa en el navegador; solo se envían a Supabase los D
 
 ## Alimentación por períodos
 
-**Se retiraron los planes diarios y la ejecución automática de jornadas.** En **Alimentación → Registrar período** se elige un lote, la fecha desde/hasta y las cantidades globales aproximadas de leche y concentrados. Es posible registrar una semana ya transcurrida aunque los DIIO del lote se hayan importado más tarde.
+**El registro se realiza por suministro de alimentación**, es decir, cada entrega de alimento al lote; por defecto **2 suministros diarios**. En **Alimentación → Registrar alimentación**, selecciona el lote, las fechas y la cantidad de leche o concentrado **por suministro para todo el lote**. No se requiere calcular un consumo diario exacto por animal ni que todos los DIIO ya estén incorporados. El sistema calcula en servidor: **cantidad por suministro × 2 suministros/día × número de días (incluyendo inicio y término)**.
+
+Puedes guardar esta combinación como **pauta de alimentación reutilizable** y cargarla en períodos posteriores. Una pauta es solo una plantilla: no se asigna un descuento diario ni reactiva el cron antiguo.
 
 - **Consumo confirmado:** descuenta una sola vez las cantidades del inventario; registra sus costos en el lote, en kardex y en rentabilidad, sin atribuirlos a animales individuales ni inventar jornadas exactas.
 - **Estimación histórica:** conserva cantidades y costos orientativos, pero **no descuenta stock** ni modifica la rentabilidad contable; es apropiada para reconstruir períodos sin evidencia de existencias actuales.

@@ -25,7 +25,7 @@ const labels:Record<AnimalFilter,string>={TODOS:'Todos',ACTIVO:'Activos',FALLECI
 const animalColumns='id,diio,lote_id,raza_id,sexo,estado,precio_adquisicion,peso_ingreso_kg,fecha_nacimiento,fecha_adquisicion,edad_aproximada_dias,observaciones,raza_nombre,lote_codigo'
 
 function Status({estado}:{estado:string}){
-  return <span className={'rounded-full px-2.5 py-1 text-xs font-semibold '+(estado==='ACTIVO'?'bg-emerald-50 text-emerald-800':estado==='FALLECIDO'?'bg-rose-50 text-rose-800':'bg-slate-100 text-slate-700')}>{estado}</span>
+  return <span className={'inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium '+(estado==='ACTIVO'?'bg-emerald-50 text-emerald-800':estado==='FALLECIDO'?'bg-rose-50 text-rose-800':'bg-slate-100 text-slate-700')}>{estado}</span>
 }
 
 /** Listados con paginación real: cada página y contador se consultan en PostgreSQL. */
@@ -40,12 +40,14 @@ export function PaginatedRegistry({type,search,filter,onFilter,onSearch,onOpenAn
   const [error,setError]=useState('')
   const [retry,setRetry]=useState(0)
   const [mostrarDetalle,setMostrarDetalle]=useState(false)
+  const [mobileDetailId,setMobileDetailId]=useState<number|null>(null)
 
   useEffect(()=>{
     const id=window.setTimeout(()=>setTerm(search.trim().slice(0,120)),250)
     return ()=>window.clearTimeout(id)
   },[search])
   useEffect(()=>{setPage(0)},[term,filter,type])
+  useEffect(()=>{setMobileDetailId(null)},[page,term,filter,type])
 
   useEffect(()=>{
     if(!supabase)return
@@ -120,10 +122,10 @@ export function PaginatedRegistry({type,search,filter,onFilter,onSearch,onOpenAn
         </button>
       </div>
     </div>
-    {type==='animales'&&<div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3" aria-label="Filtrar animales por estado">
+    {type==='animales'&&<div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-3 py-2" aria-label="Filtrar animales por estado">
       {states.map(state=><button key={state} type="button" aria-pressed={filter===state}
         onClick={()=>onFilter(state)}
-        className={'min-h-10 rounded-lg border px-3 py-2 text-xs font-semibold '+(filter===state?'border-emerald-900 bg-emerald-900 text-white':'border-slate-200 bg-slate-50 text-slate-700')}>
+        className={'min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold '+(filter===state?'border-emerald-900 bg-emerald-900 text-white':'border-slate-200 bg-slate-50 text-slate-700')}>
         {labels[state]} ({format(counts[state])})
       </button>)}
     </div>}
@@ -135,34 +137,40 @@ export function PaginatedRegistry({type,search,filter,onFilter,onSearch,onOpenAn
     {!loading&&!error&&count===0&&<p className="px-4 py-7 text-sm text-slate-500">No se encontraron registros.</p>}
     {!loading&&!error&&type==='animales'&&animals.length>0&&<>
       <div className="divide-y divide-slate-100 md:hidden" aria-label="Animales encontrados">
-        {animals.map(a=><article key={a.id} className="space-y-2 px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
+        {animals.map(a=><article key={a.id} className="px-3 py-2">
+          <div className="flex min-w-0 items-center justify-between gap-2">
             <button type="button" onClick={()=>onOpenAnimal(a.id)}
               aria-label={'Abrir ficha DIIO '+a.diio}
-              className="min-h-11 text-left text-sm font-semibold text-emerald-800 underline underline-offset-4">{a.diio}</button>
+              className="inline-flex min-h-9 min-w-0 items-center truncate text-left text-sm font-semibold text-emerald-800 underline underline-offset-4">{a.diio}</button>
             <Status estado={a.estado}/>
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-700">
-            <span>{a.lote_codigo??'Sin lote'}</span>
-            <span className="text-slate-500">{a.raza_nombre??'Sin raza'}</span>
+          <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-slate-600">
+            <span className="min-w-0 flex-1 truncate" title={(a.lote_codigo??'Sin lote')+' · '+(a.raza_nombre??'Sin raza')}>
+              {a.lote_codigo??'Sin lote'} · {a.raza_nombre??'Sin raza'}
+            </span>
+            <button type="button" aria-expanded={mobileDetailId===a.id}
+              onClick={()=>setMobileDetailId(id=>id===a.id?null:a.id)}
+              className="inline-flex min-h-8 shrink-0 items-center font-medium text-slate-600 underline-offset-2 hover:underline">
+              {mobileDetailId===a.id?'Ocultar':'Detalles'}
+            </button>
           </div>
-          <details className="text-xs text-slate-600"><summary className="cursor-pointer py-1">Más datos</summary>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <p>Sexo: {a.sexo}</p><p>Peso inicial: {a.peso_ingreso_kg!=null?format(a.peso_ingreso_kg)+' kg':'—'}</p>
-              <p className="col-span-2">Valor base: {money(a.precio_adquisicion)}</p>
-            </div>
-          </details>
+          {mobileDetailId===a.id&&<div className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+            <p>Sexo: {a.sexo}</p>
+            <p>Peso inicial: {a.peso_ingreso_kg!=null?format(a.peso_ingreso_kg)+' kg':'—'}</p>
+            <p className="col-span-2">Valor base: {money(a.precio_adquisicion)}</p>
+          </div>}
         </article>)}
       </div>
       <div className="hidden md:block">
-        <TableScroll><table className="min-w-full text-left text-sm">
-          <thead><tr>{['DIIO / ficha','Raza','Lote',...(mostrarDetalle?['Sexo','Peso inicial','Valor base']:[]),'Estado'].map(label=><th scope="col" key={label} className="p-3 text-xs font-semibold text-slate-600">{label}</th>)}</tr></thead>
+        <TableScroll><table className="min-w-full text-left text-xs">
+          <thead className="bg-slate-50"><tr>{['DIIO / ficha','Raza','Lote',...(mostrarDetalle?['Sexo','Peso inicial','Valor base']:[]),'Estado'].map(label=><th scope="col" key={label} className="whitespace-nowrap px-2.5 py-2 text-[11px] font-semibold text-slate-600">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">{animals.map(a=><tr key={a.id} className="hover:bg-slate-50">
-            <td className="p-3 font-semibold"><button type="button" onClick={()=>onOpenAnimal(a.id)} aria-label={'Abrir ficha DIIO '+a.diio}
-              className="min-h-10 text-emerald-800 underline underline-offset-4">{a.diio}</button></td>
-            <td className="p-3">{a.raza_nombre??'—'}</td><td className="p-3">{a.lote_codigo??'—'}</td>
-            {mostrarDetalle&&<><td className="p-3">{a.sexo}</td><td className="p-3">{a.peso_ingreso_kg!=null?format(a.peso_ingreso_kg)+' kg':'—'}</td>
-            <td className="p-3 tabular-nums">{money(a.precio_adquisicion)}</td></>}<td className="p-3"><Status estado={a.estado}/></td>
+            <td className="whitespace-nowrap px-2.5 py-1 font-semibold"><button type="button" onClick={()=>onOpenAnimal(a.id)} aria-label={'Abrir ficha DIIO '+a.diio}
+              className="inline-flex min-h-8 items-center text-emerald-800 underline underline-offset-4">{a.diio}</button></td>
+            <td className="max-w-48 truncate px-2.5 py-1" title={a.raza_nombre??undefined}>{a.raza_nombre??'—'}</td>
+            <td className="max-w-40 truncate px-2.5 py-1" title={a.lote_codigo??undefined}>{a.lote_codigo??'—'}</td>
+            {mostrarDetalle&&<><td className="whitespace-nowrap px-2.5 py-1">{a.sexo}</td><td className="whitespace-nowrap px-2.5 py-1">{a.peso_ingreso_kg!=null?format(a.peso_ingreso_kg)+' kg':'—'}</td>
+            <td className="whitespace-nowrap px-2.5 py-1 tabular-nums">{money(a.precio_adquisicion)}</td></>}<td className="whitespace-nowrap px-2.5 py-1"><Status estado={a.estado}/></td>
           </tr>)}</tbody>
         </table></TableScroll>
       </div>

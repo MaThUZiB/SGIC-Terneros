@@ -9,7 +9,7 @@ import { calcularRacionDiaria, sugerenciaPorAnimal, type ModoRacion } from '../u
 type Row = { id:number; nombre?:string; codigo?:string; diio?:string; estado?:string; activo?:boolean; producto_id?:number; unidad_base_id?:number; stock_actual?:number; costo_promedio?:number; tipo_insumo?:string; apto_plan?:boolean; cantidad_actual?:number; cantidad_base?:number; activa?:boolean; fecha?:string; precio_unitario?:number; unidad_ingreso?:string; factor?:number; plan_id?:number; lote_id?:number; cantidad_diaria?:number; fecha_inicio?:string; fecha_fin?:string; componentes?:{id:number;producto_id:number;cantidad_diaria:number;unidad_id:number}[] }
 type PurchaseEntry = {fecha:string;precio_unitario:number;unidad_ingreso:string;factor:number}
 const types:Record<string,string>={LECHE:'Leche / sustituto lácteo',CONCENTRADO:'Concentrado',FORRAJE:'Forraje (heno / ensilaje)',CAMA:'Material de cama (paja)',MEDICAMENTO:'Medicamento',OTRO:'Otro insumo'}
-export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','tratamiento','consumo']
+export const supplyActions=['ingresoInsumo','usoInsumo','perdidaInsumo','tratamiento']
 const titles:Record<string,string>={ingresoInsumo:'Ingresar insumos',usoInsumo:'Registrar uso',perdidaInsumo:'Registrar pérdida',configInsumo:'Uso en planes',consumoPlan:'Confirmar alimentación del día',tratamiento:'Registrar tratamiento',consumo:'Registrar alimentación real'}
 const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'})
 const money=(n:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:2}).format(n)
@@ -30,7 +30,7 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
  const intake=action==='ingresoInsumo',plan=action==='consumoPlan',config=action==='configInsumo'
  async function load(){
   if(!supabase)return
-  const keys=['producto','unidad_medida','lote','animal','proveedor','asignacion_plan_lote','detalle_plan_consumo','plan_consumo','presentacion_producto']
+  const keys=['producto','unidad_medida','lote','animal','proveedor','presentacion_producto']
   const results=await Promise.all(keys.map(k=>supabase!.from(k).select('*').order('id').limit(1000)))
   const bad=results.find(r=>r.error)
   if(bad?.error){setError(bad.error.message);setLoading(false);return}
@@ -178,7 +178,7 @@ export function SupplyOperations({action,onClose,onChanged,onCompleted,initialAs
    {intake&&<><div className="grid grid-cols-2 gap-2">{[['COMPRA','Compra'],['INICIAL','Existencia inicial']].map(([id,label])=><button type="button" key={id} aria-pressed={v.tipo===id} onClick={()=>set('tipo',id)} className={'rounded-xl border p-3 text-sm '+(v.tipo===id?'bg-emerald-900 text-white':'bg-white')}>{label}</button>)}</div><label className="flex items-center gap-3 py-2"><input type="checkbox" checked={fresh} onChange={e=>toggleFresh(e.target.checked)}/> Crear un insumo nuevo</label></>}
    {!plan&&(!intake||!fresh)&&<div><p className="mb-2 text-sm font-medium">Insumo</p><AnimalSearch entity="insumo" options={products.map(p=>({id:p.id,diio:p.nombre!,detail:`${types[p.tipo_insumo??'OTRO']} · Disponible: ${p.stock_actual} ${unit(p)}`}))} value={v.producto_id??''} onChange={chooseProduct} disabled={busy||loading}/>{!loading&&!products.length&&<p className="mt-2 text-sm text-slate-600">Aún no hay insumos. {intake?'Marca «Crear un insumo nuevo».':'Registra primero un ingreso en Inventario.'}</p>}</div>}
    {intake&&fresh&&<>{input('nombre','Nombre del insumo')}{duplicate&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Ya existe «{duplicate.nombre}». {duplicate.activo?<button type="button" onClick={()=>{toggleFresh(false);chooseProduct(String(duplicate.id))}} className="font-semibold underline">Usar este insumo existente</button>:'Actívalo desde Catálogos antes de volver a comprarlo.'}</div>}<Field label="Tipo de insumo"><select className={cls} value={v.tipo_insumo} onChange={e=>{set('tipo_insumo',e.target.value);setEligible(['LECHE','CONCENTRADO'].includes(e.target.value));set('unidad',e.target.value==='CAMA'?'bolo':e.target.value==='MEDICAMENTO'?'ml':'kg')}}>{Object.entries(types).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field>{select('unidad','Unidad para controlar existencias',[{id:'kg',label:'Kilogramos (kg)'},{id:'l',label:'Litros (l)'},{id:'ml',label:'Mililitros (ml)'},{id:'unidad',label:'Unidades'},{id:'bolo',label:'Bolos'}])}</>}
-   {(config||(intake&&fresh))&&<label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm"><input type="checkbox" checked={eligible} onChange={e=>setEligible(e.target.checked)}/> Disponible para planes de alimentación</label>}
+   {(config||(intake&&fresh))&&<label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm"><input type="checkbox" checked={eligible} onChange={e=>setEligible(e.target.checked)}/> Habilitado para raciones antiguas</label>}
    {intake&&<>
     {!fresh&&product&&<p className="text-xs text-slate-600">Existencia: {product.stock_actual} {stockUnit}</p>}
     <label className="flex items-center gap-3 py-2 text-sm"><input type="checkbox" checked={pack} onChange={e=>changePack(e.target.checked)}/> Ingresar por saco, envase u otra presentación</label>

@@ -191,7 +191,7 @@ export function CloudWorkspacePage() {
 
         {!error && datos && (
           <>
-            {visibleActions.length>0&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-3">
+            {visibleActions.length>0&&!(tab==='animales'&&animalCard)&&<section aria-label={'Acciones de '+moduleTitles[tab]} className="space-y-3">
               {tab!=='catalogos'&&tab!=='planes'&&!operation&&<div className="flex flex-wrap items-center gap-2">
                 <button type="button" onClick={()=>openOperation(visibleActions[0].id)}
                   className="rounded-lg bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
@@ -289,8 +289,8 @@ export function CloudWorkspacePage() {
             {tab==='animales'&&animalCard&&fichaAnimal&&<AnimalCard key={animalCard.id}
               animal={fichaAnimal} raza={razasPorId.get(fichaAnimal.raza_id)??'Sin raza'} lote={lotesPorId.get(fichaAnimal.lote_id)??'Sin lote'}
               esAdmin={esAdmin} action={animalCard.action??null} onAction={setAnimalAction} onClose={closeAnimal} onChanged={()=>setRevision(x=>x+1)}/>}
-            {(tab==='animales'||tab==='inventario')&&<PaginatedRegistry key={tab}
-              type={tab} search={buscar} filter={filtroAnimal} onFilter={setFiltroAnimal}
+            {(tab==='inventario'||(tab==='animales'&&!animalCard))&&<PaginatedRegistry key={tab}
+              type={tab} search={buscar} filter={filtroAnimal} onFilter={setFiltroAnimal} onSearch={setBuscar}
               onOpenAnimal={openAnimal} revision={revision} presentaciones={datos.presentaciones}/>}
             
             {tab==='compras'&&<PurchasesRegistry revision={revision}

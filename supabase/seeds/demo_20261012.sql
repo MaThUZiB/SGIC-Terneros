@@ -24,8 +24,6 @@ declare
   v_concentrado bigint;
   v_heno bigint;
   v_minerales bigint;
-  v_plan_a bigint;
-  v_plan_b bigint;
   v_compra_insumo bigint;
   v_presentacion_leche bigint;
   v_presentacion_concentrado bigint;
@@ -141,22 +139,7 @@ begin
     (v_compra_insumo,v_leche,v_presentacion_leche,8,200,1800,360000),
     (v_compra_insumo,v_concentrado,v_presentacion_concentrado,10,250,660,165000);
 
-  insert into public.plan_consumo(nombre,descripcion,observaciones)
-     values('Plan de inicio DEMO','Referencia de alimentación; no descuenta inventario.',
-            'No generar consumos hasta implementar operación transaccional')
-     returning id into v_plan_a;
-  insert into public.plan_consumo(nombre,descripcion)
-     values('Plan crecimiento DEMO','Referencia para pruebas, sin consumo automático')
-     returning id into v_plan_b;
-  insert into public.detalle_plan_consumo(plan_id,producto_id,cantidad_diaria,unidad_id) values
-    (v_plan_a,v_leche,0.250,v_kg),
-    (v_plan_a,v_concentrado,0.500,v_kg),
-    (v_plan_b,v_concentrado,1.500,v_kg),
-    (v_plan_b,v_heno,0.900,v_kg),
-    (v_plan_b,v_minerales,0.020,v_kg);
-  insert into public.asignacion_plan_lote(lote_id,plan_id,fecha_inicio) values
-    (v_lote_a,v_plan_a,date '2026-09-15'),
-    (v_lote_b,v_plan_b,date '2026-09-20');
+  -- Los períodos se registran por operadores; el demo no crea consumos ficticios.
 
   insert into public.categoria_gasto(nombre,descripcion) values
      ('Flete DEMO','Categoría ficticia de transporte'),

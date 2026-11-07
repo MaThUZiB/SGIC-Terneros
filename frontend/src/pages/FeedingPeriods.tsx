@@ -6,7 +6,7 @@ type Lote = { id:number; codigo:string; estado:string }
 type Insumo = { id:number; nombre:string; tipo_insumo:string; unidad_base_id:number; stock_actual:number; costo_promedio:number }
 type Unidad = { id:number; codigo:string }
 type Presentacion = { id:number; producto_id:number; nombre:string; cantidad_base:number; activa:boolean }
-type Periodo = { id:number; lote_id:number; fecha_inicio:string; fecha_fin:string; suministros_dia:number; pauta_id:number|null; estado:'ESTIMADO'|'DESCONTADO'; observaciones:string|null; creado_en:string }
+type Periodo = { id:number; lote_id:number; fecha_inicio:string; fecha_fin:string; suministros_dia:number; pauta_id:number|null; estado:'PLANIFICADO'|'ESTIMADO'|'DESCONTADO'; observaciones:string|null; creado_en:string }
 type Detalle = { id:number; periodo_id:number; producto_id:number; cantidad_por_suministro:number|null; cantidad_total:number; costo_referencia:number }
 type Linea = { key:string; producto_id:string; cantidad:string; presentacion_id:string }
 type Pauta = { id:number; nombre:string; suministros_dia:number; detalles:{producto_id:number;cantidad_por_suministro:number}[]; activo:boolean }
@@ -45,9 +45,10 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
   const [nuevo,setNuevo]=useState(false)
   const [seleccion,setSeleccion]=useState<number|null>(null)
   const [loteId,setLoteId]=useState(String(initialLoteId??''))
-  const [inicio,setInicio]=useState(haceDias(6))
-  const [fin,setFin]=useState(hoy())
-  const [descontar,setDescontar]=useState(true)
+  const [inicio,setInicio]=useState(hoy())
+  const [fin,setFin]=useState(haceDias(-6))
+  const [modo,setModo]=useState<'PLANIFICADO'|'ESTIMADO'|'DESCONTADO'>('PLANIFICADO')
+  const descontar=modo==='DESCONTADO'
   const [observaciones,setObservaciones]=useState('')
   const [lineas,setLineas]=useState<Linea[]>([nuevaLinea()])
   const [solicitud,setSolicitud]=useState(()=>crypto.randomUUID())
@@ -101,6 +102,26 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
     const total=redondear(porSuministro*SUMINISTROS_DIARIOS*cantidadDias)
     return {linea,producto,base,porSuministro,total,costo:producto?total*Number(producto.costo_promedio):0}
   }),[lineas,productos,presentaciones,cantidadDias])
+  // Solo la demanda pendiente; los suministros futuros se agrupan por producto
+  // entre todos los lotes, con independencia del stock. No representan movimientos.
+  const demandaPendiente=useMemo(()=>{
+    const totales=new Map<number,number>()
+    const actual=hoy()
+    for(const periodo of periodos){
+      if(periodo.estado!=='PLANIFICADO'||periodo.fecha_fin<actual)continue
+      const desde=periodo.fecha_inicio>actual?periodo.fecha_inicio:actual
+      const diasRestantes=dias(desde,periodo.fecha_fin)
+      const diasOriginales=dias(periodo.fecha_inicio,periodo.fecha_fin)
+      for(const detalle of detalles){
+        if(detalle.periodo_id!==periodo.id)continue
+        const cantidad=detalle.cantidad_por_suministro!==null
+          ? Number(detalle.cantidad_por_suministro)*periodo.suministros_dia*diasRestantes
+          : Number(detalle.cantidad_total)*diasRestantes/diasOriginales
+        totales.set(detalle.producto_id,(totales.get(detalle.producto_id)??0)+cantidad)
+      }
+    }
+    return totales
+  },[periodos,detalles])
   const visibles=periodos.filter(p=>!filtroLote||String(p.lote_id)===filtroLote)
   const detalleSeleccionado=seleccion===null?null:periodos.find(p=>p.id===seleccion)??null
   const seleccionDetalles=detalles.filter(d=>d.periodo_id===seleccion)
@@ -108,6 +129,11 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
   const nombreProducto=(id:number)=>productos.find(p=>p.id===id)?.nombre??'Insumo #'+id
   const costo=(id:number)=>detalles.filter(d=>d.periodo_id===id).reduce((total,d)=>total+Number(d.costo_referencia),0)
 
+  function seleccionarModo(siguiente:'PLANIFICADO'|'ESTIMADO'|'DESCONTADO'){
+    setModo(siguiente)
+    if(siguiente==='PLANIFICADO'&&fin<=hoy()){setInicio(hoy());setFin(haceDias(-6))}
+    if(siguiente!=='PLANIFICADO'&&fin>hoy()){setInicio(haceDias(6));setFin(hoy())}
+  }
   function cambiarLinea(key:string,patch:Partial<Linea>){
     setPautaId('')
     setLineas(prev=>prev.map(l=>l.key===key?{...l,...patch}:l))
@@ -159,18 +185,22 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
   function preparar(){
     setError('');setAviso('')
     if(!loteId||!lotes.some(l=>String(l.id)===loteId)){setError('Selecciona un lote.');return}
-    if(!inicio||!fin||inicio>fin||fin>hoy()||dias(inicio,fin)>366){setError('Revisa las fechas. El período no puede terminar en el futuro ni superar 366 días.');return}
+    if(!inicio||!fin||inicio>fin||dias(inicio,fin)>366||(modo!=='PLANIFICADO'&&fin>hoy())){
+      setError('Revisa las fechas: máximo 366 días. Para planificar a futuro, selecciona Planificación.');return
+    }
     const problema=validarLineas()
     if(problema){setError(problema);return}
     if(descontar&&calculadas.some(x=>x.producto&&x.total>Number(x.producto.stock_actual))){
-      setError('No existe stock suficiente para descontar todos los insumos. Para reconstruir semanas antiguas, puedes guardar solamente una estimación.');return
+      setError('No hay stock suficiente para registrar un consumo real. Puedes guardar una planificación sin stock o una estimación histórica sin descuento.');return
     }
     const resumen=calculadas.map(x=>x.producto?.nombre+': '+numero(x.porSuministro)+' '+unidad(x.producto)+' por suministro → '+numero(x.total)+' '+unidad(x.producto)+' total').join('\n')
     setConfirmacion({
-      title:descontar?'Confirmar consumo y descontar inventario':'Guardar estimación histórica',
+      title:descontar?'Confirmar consumo y descontar inventario':modo==='PLANIFICADO'?'Guardar planificación sin descuento':'Guardar estimación histórica',
       description:nombreLote(Number(loteId))+' · '+fecha(inicio)+' al '+fecha(fin)+' · '+cantidadDias+' días × '+SUMINISTROS_DIARIOS+' suministros diarios\n'+resumen+
-        (descontar?'\nSe descontará el stock una sola vez, no diariamente.':'\nNo se modificarán existencias ni rentabilidad contabilizada.'),
-      confirmLabel:descontar?'Registrar consumo':'Guardar estimación',
+        (descontar?'\nSe descontará el stock una sola vez, no diariamente.':modo==='PLANIFICADO'
+          ?'\nEsta previsión NO reserva ni descuenta stock. Puedes planificar aunque falten existencias.':
+            '\nNo se modificarán existencias ni rentabilidad contabilizada.'),
+      confirmLabel:descontar?'Registrar consumo':modo==='PLANIFICADO'?'Guardar planificación':'Guardar estimación',
       summary:[{label:'Total referencial',value:clp(calculadas.reduce((s,x)=>s+x.costo,0)),emphasis:true}]
     })
   }
@@ -180,7 +210,7 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
     const payload={
       solicitud,lote_id:Number(loteId),fecha_inicio:inicio,fecha_fin:fin,
       suministros_dia:SUMINISTROS_DIARIOS,pauta_id:pautaId?Number(pautaId):null,
-      descontar_stock:descontar,observaciones:observaciones.trim(),
+      tipo_registro:modo,descontar_stock:descontar,observaciones:observaciones.trim(),
       detalles:calculadas.map(x=>({producto_id:x.producto!.id,cantidad_por_suministro:x.porSuministro}))
     }
     try{
@@ -188,7 +218,9 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
       if(result.error)throw Error(result.error.message)
       setConfirmacion(null);setNuevo(false);setSeleccion(Number(result.data))
       setSolicitud(crypto.randomUUID());setLineas([nuevaLinea()]);setObservaciones('');setPautaId('')
-      setAviso(descontar?'Consumo registrado. El stock y los costos del lote fueron actualizados.':'Estimación guardada sin descontar inventario.')
+      setAviso(descontar?'Consumo registrado. El stock y los costos del lote fueron actualizados.':modo==='PLANIFICADO'
+        ?'Planificación guardada. No se reservó ni descontó inventario; podrás registrar el consumo real posteriormente.':
+          'Estimación histórica guardada sin descontar inventario.')
       await cargar()
     }catch(e){setConfirmacion(null);setError(e instanceof Error?e.message:'No se pudo guardar el período.')}
     finally{setGuardando(false)}
@@ -207,6 +239,18 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
       <div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-base font-semibold">Nuevo período de alimentación</h3>
         <button type="button" onClick={()=>{setNuevo(false);setError('')}} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">Cancelar</button></div>
       <form onSubmit={e=>{e.preventDefault();preparar()}} className="mx-auto max-w-3xl space-y-5">
+        <label className="block space-y-1.5 text-sm"><span className="font-medium">Qué deseas registrar</span>
+          <select className={field} value={modo} onChange={e=>seleccionarModo(e.target.value as 'PLANIFICADO'|'ESTIMADO'|'DESCONTADO')}>
+            <option value="PLANIFICADO">Planificación (sin exigir stock)</option>
+            <option value="DESCONTADO">Consumo realizado (descontar stock)</option>
+            <option value="ESTIMADO">Estimación histórica (sin descuento)</option>
+          </select>
+          <span className="block text-xs text-slate-600">{modo==='PLANIFICADO'
+            ?'Se permite planificar meses futuros, aunque el inventario disponible sea menor que lo previsto. No se reservan existencias.'
+            :modo==='DESCONTADO'
+              ?'Solo períodos finalizados y con stock suficiente. El descuento se realiza una vez.'
+              :'Solo períodos ya terminados. Guarda el cálculo sin modificar el stock.'}</span>
+        </label>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="space-y-1.5 text-sm"><span className="font-medium">Lote</span>
             <select className={field} required value={loteId} onChange={e=>setLoteId(e.target.value)}>
@@ -214,10 +258,10 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
             </select>
           </label>
           <label className="space-y-1.5 text-sm"><span className="font-medium">Desde</span>
-            <input className={field} type="date" max={hoy()} required value={inicio} onChange={e=>setInicio(e.target.value)}/>
+            <input className={field} type="date" max={modo==='PLANIFICADO'?undefined:hoy()} required value={inicio} onChange={e=>setInicio(e.target.value)}/>
           </label>
           <label className="space-y-1.5 text-sm"><span className="font-medium">Hasta</span>
-            <input className={field} type="date" max={hoy()} required value={fin} onChange={e=>setFin(e.target.value)}/>
+            <input className={field} type="date" max={modo==='PLANIFICADO'?undefined:hoy()} required value={fin} onChange={e=>setFin(e.target.value)}/>
           </label>
         </div>
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -256,7 +300,13 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
             </div>
             {producto&&Number.isFinite(total)&&total>0&&<p className="mt-2 text-xs text-slate-600">
               {numero(redondear(asNumber(linea.cantidad)*factor(linea)))} {unidad(producto)} × {SUMINISTROS_DIARIOS} suministros × {cantidadDias} días = <strong>{numero(total)} {unidad(producto)} en el período</strong>
-              <span className="block mt-1">Stock disponible: {numero(Number(producto.stock_actual))} {unidad(producto)}</span>
+              {modo==='PLANIFICADO'?<span className="block mt-1">
+                Stock: {numero(Number(producto.stock_actual))} {unidad(producto)} ·
+                Demanda futura en lotes (incluyendo este registro): {numero(redondear((demandaPendiente.get(producto.id)??0)+total))} {unidad(producto)}
+                {Math.max(0,redondear((demandaPendiente.get(producto.id)??0)+total-Number(producto.stock_actual)))>0&&<strong className="mt-1 block text-amber-700">
+                  Faltante estimado: {numero(redondear(Math.max(0,(demandaPendiente.get(producto.id)??0)+total-Number(producto.stock_actual))))} {unidad(producto)}. No impide planificar.
+                </strong>}
+              </span>:<span className="block mt-1">Stock disponible: {numero(Number(producto.stock_actual))} {unidad(producto)}</span>}
             </p>}
           </div>)}
         </div>
@@ -272,12 +322,9 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
           </div>
           <p className="mt-2 text-xs text-slate-500">La pauta solo guarda las cantidades por suministro para reutilizarlas. No genera consumos ni descuenta inventario por sí sola.</p>
         </details>}
-        <label className="flex items-start gap-3 rounded-lg border border-slate-200 px-4 py-3 text-sm">
-          <input type="checkbox" checked={descontar} onChange={e=>setDescontar(e.target.checked)} className="mt-1 accent-emerald-900"/>
-          <span><strong>Descontar del inventario al registrar</strong>
-            <span className="mt-1 block text-xs text-slate-600">Desmarca esta opción para reconstruir una semana antigua que ya no corresponde descontar del stock actual. Esa estimación no se imputará a rentabilidad.</span>
-          </span>
-        </label>
+        {modo==='PLANIFICADO'&&<p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          Las existencias insuficientes solo se señalan como faltante de abastecimiento. No bloquean planes ni descuentan inventario.
+        </p>}
         <details className="rounded-lg border border-slate-200 px-4 py-3 text-sm"><summary className="cursor-pointer font-medium">Observaciones (opcional)</summary>
           <textarea className={field+' mt-3'} maxLength={500} rows={2} value={observaciones} onChange={e=>setObservaciones(e.target.value)} placeholder="Ej. consumo reconstruido de la semana de llegada"/>
         </details>
@@ -322,7 +369,7 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
             <span><strong className="text-sm">{nombreLote(p.lote_id)}</strong>
               <span className="mt-1 block text-xs text-slate-500">{fecha(p.fecha_inicio)} — {fecha(p.fecha_fin)} · {dias(p.fecha_inicio,p.fecha_fin)} días · {p.suministros_dia} suministros/día</span>
             </span>
-            <span className="flex items-center gap-3"><span className="text-right"><strong className="block text-sm">{clp(costo(p.id))}</strong><small className="text-xs text-slate-500">{p.estado==='DESCONTADO'?'Stock descontado':'Solo estimación'}</small></span><span className="text-slate-500">{seleccion===p.id?'−':'+'}</span></span>
+            <span className="flex items-center gap-3"><span className="text-right"><strong className="block text-sm">{clp(costo(p.id))}</strong><small className="text-xs text-slate-500">{p.estado==='DESCONTADO'?'Stock descontado':p.estado==='PLANIFICADO'?'Planificado · sin descuento':'Solo estimación'}</small></span><span className="text-slate-500">{seleccion===p.id?'−':'+'}</span></span>
           </button>
           {detalleSeleccionado?.id===p.id&&<div className="border-t border-slate-100 bg-slate-50 px-4 py-4">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Detalle del período</h4>
@@ -330,7 +377,9 @@ export function FeedingPeriods({initialLoteId,onSelectLote,esAdmin}:{
               <span>{nombreProducto(d.producto_id)}{d.cantidad_por_suministro!==null&&<small className="mt-1 block text-slate-500">{numero(Number(d.cantidad_por_suministro))} {unidad(productos.find(x=>x.id===d.producto_id))} por suministro</small>}</span><span className="font-medium">{numero(Number(d.cantidad_total))} {unidad(productos.find(x=>x.id===d.producto_id))} total</span>
             </div>)}</div>
             {p.observaciones&&<p className="mt-3 text-xs text-slate-600">{p.observaciones}</p>}
-            <p className="mt-3 text-xs text-slate-500">Cantidades globales aproximadas. No representan una medición individual ni un registro diario.</p>
+            <p className="mt-3 text-xs text-slate-500">{p.estado==='PLANIFICADO'
+              ?'Previsión de abastecimiento sin descuento de existencias. Puede coexistir con el consumo realmente registrado para estas fechas.'
+              :'Cantidades globales aproximadas. No representan una medición individual ni un registro diario.'}</p>
           </div>}
         </div>)}</div>}
     </div>

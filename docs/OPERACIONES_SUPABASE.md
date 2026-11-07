@@ -95,10 +95,16 @@ El saldo se concilia como `entradas − salidas + ajustes firmados`; los registr
 4. Seleccionar los insumos y escribir la **cantidad por suministro**, no por ternero. Opcionalmente usar presentaciones (sacos); SGIC convierte automáticamente a la unidad base.
 5. SGIC calcula la **cantidad total de cada insumo = cantidad por suministro × 2 × días inclusivos**. Ejemplo: 3 kg por suministro durante 7 días equivalen a 42 kg para ese lote. El costo se muestra como orientativo según el PMP.
 6. Si se desea repetir la combinación, un administrador puede usar **Guardar esta combinación como pauta reutilizable**. Otros usuarios pueden cargarla como base desde **Usar una pauta guardada**. Archivar una pauta conserva el historial.
-7. Mantener **Descontar del inventario al registrar** para descontar el total en una operación atómica y atribuir el costo al lote; desmarcarlo para una estimación histórica que no debe modificar stock ni rentabilidad.
-8. Confirmar y consultar en el historial el total del período y, en el detalle, la cantidad por suministro.
+7. Elegir el **tipo de registro**:
+   - **Planificación (sin exigir stock):** permite meses futuros y almacena una previsión. Nunca reserva ni descuenta productos, incluso si se proyecta una demanda superior al inventario actual.
+   - **Consumo realizado (descontar stock):** requiere fechas finalizadas y stock suficiente; registra el total como salida única y como costo real del lote.
+   - **Estimación histórica (sin descuento):** permite reconstruir períodos pasados sin modificar stock ni rentabilidad.
+8. Revisar las cantidades. En modo planificación, SGIC muestra la demanda proyectada acumulada de los lotes, las existencias y el **faltante estimado**, que es solo un aviso y nunca impide guardar.
+9. Confirmar y revisar el historial. Una planificación puede coexistir con el consumo confirmado de las mismas fechas; el stock se descuenta únicamente por la operación real.
 
-Los cálculos se ejecutan de nuevo en PostgreSQL: el total no se acepta sin validación desde el navegador. La tarea automática diaria y las asignaciones del antiguo sistema de planes **no se han reactivado**. Se impiden períodos solapados y descuentos duplicados; un consumo estimado no se registra como costo contable.
+**Caso de ejemplo:** tres lotes planifican en conjunto **1000 kg de leche**, mientras que el inventario tiene **200 kg**. Se registran los tres planes y un faltante orientativo de **800 kg**, sin alterar las 200 unidades existentes. Posteriormente los consumos reales se descuentan conforme se registren y exista stock suficiente.
+
+Los cálculos se ejecutan de nuevo en PostgreSQL. Se rechazan planes solapados del mismo lote, consumos confirmados duplicados, y salidas reales que excedan el inventario. **La tarea automática diaria antigua no está activa.**
 
 ### Tratamiento sanitario
 

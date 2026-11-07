@@ -67,9 +67,10 @@ La exportación XLS se procesa en el navegador; solo se envían a Supabase los D
 
 Puedes guardar esta combinación como **pauta de alimentación reutilizable** y cargarla en períodos posteriores. Una pauta es solo una plantilla: no se asigna un descuento diario ni reactiva el cron antiguo.
 
-- **Consumo confirmado:** descuenta una sola vez las cantidades del inventario; registra sus costos en el lote, en kardex y en rentabilidad, sin atribuirlos a animales individuales ni inventar jornadas exactas.
-- **Estimación histórica:** conserva cantidades y costos orientativos, pero **no descuenta stock** ni modifica la rentabilidad contable; es apropiada para reconstruir períodos sin evidencia de existencias actuales.
-- El sistema rechaza períodos solapados del mismo lote y evita contabilizar las mismas jornadas manuales dos veces. La etiqueta **aproximado** se mantiene visible en el historial.
+- **Planificación futura:** admite fechas posteriores a hoy y calcula toda la demanda de insumos sin exigir ni reservar existencias. Permite planificar, por ejemplo, **1000 kg para 3 lotes aunque existan solo 200 kg**; informa el faltante de 800 kg sin bloquear. Al registrar la previsión no se generan movimientos ni costos reales.
+- **Consumo confirmado:** para fechas ya finalizadas, descuenta una sola vez del inventario disponible, actualizando los costos del lote y la rentabilidad; exige stock suficiente y puede coexistir con la planificación de esas fechas.
+- **Estimación histórica:** guarda cantidades y costos orientativos sin descuento, útil para reconstruir semanas anteriores.
+- No se permiten dos planes con fechas solapadas para un mismo lote ni dos registros de consumo/estimación superpuestos. **Un plan no impide registrar más tarde su consumo real.**
 
 ## Arquitectura
 

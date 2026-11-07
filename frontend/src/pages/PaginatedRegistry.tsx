@@ -15,7 +15,7 @@ type Producto={
 }
 type Props={
   type:'animales'|'inventario';search:string;filter:AnimalFilter;
-  onFilter:(f:AnimalFilter)=>void;onOpenAnimal:(id:number)=>void;
+  onFilter:(f:AnimalFilter)=>void;onSearch:(value:string)=>void;onOpenAnimal:(id:number)=>void;
   revision:number;presentaciones:PresentacionStock[]
 }
 const format=(n:number)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:3}).format(n)
@@ -29,7 +29,7 @@ function Status({estado}:{estado:string}){
 }
 
 /** Listados con paginación real: cada página y contador se consultan en PostgreSQL. */
-export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revision,presentaciones}:Props){
+export function PaginatedRegistry({type,search,filter,onFilter,onSearch,onOpenAnimal,revision,presentaciones}:Props){
   const [page,setPage]=useState(0)
   const [term,setTerm]=useState(search.trim())
   const [animals,setAnimals]=useState<AnimalRow[]>([])
@@ -109,7 +109,8 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
       <h2 className="font-semibold">{type==='animales'?'Listado':'Existencias'}</h2>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <input type="search" aria-label={type==='animales'?'Buscar animales':'Buscar insumos'} value={search} onChange={e=>onSearch(e.target.value)} placeholder={type==='animales'?'Buscar DIIO, raza o lote':'Buscar insumo'} className="w-full min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm sm:w-60"/>
         <span role="status" aria-live="polite" className="text-xs tabular-nums text-slate-600">
           {loading?'Cargando…':error?'Error':format(count)+' resultados'}
         </span>

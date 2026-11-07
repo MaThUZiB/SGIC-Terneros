@@ -13,12 +13,12 @@ Este documento describe la operación vigente sobre React/Vite y Supabase. Las a
 | Finanzas | Ventas, Gastos, Rentabilidad |
 | Administración | Catálogos, Historial y auditoría, Usuarios |
 
-En escritorio la navegación es lateral fija; en pantallas pequeñas se abre desde el botón de menú. Las tarjetas del resumen enlazan a los módulos correspondientes. **Actualizar** vuelve a consultar los datos desde Supabase sin ejecutar altas, modificaciones ni bajas.
+En escritorio la navegación es lateral fija; en pantallas pequeñas se abre desde el botón de menú. Cada módulo presenta una acción principal y registros compactos; las opciones menos frecuentes, columnas adicionales e información económica se muestran al abrir sus detalles. Al abrir un formulario se oculta el listado de ese módulo para evitar funciones repetidas. **Actualizar** vuelve a consultar los datos desde Supabase sin ejecutar altas, modificaciones ni bajas.
 
 ## 2. Roles de acceso
 
 - **Administrador (ADMIN):** crea catálogos, registra compras de animales e insumos, bajas, divisiones, ajustes, rectificaciones, gastos y ventas; autoriza solicitudes y usuarios; compara exportaciones SIPECweb e incorpora animales supervisadamente.
-- **Operador (OPERADOR):** registra pesajes, consumos manuales o desde plan y tratamientos sanitarios; consulta registros permitidos.
+- **Operador (OPERADOR):** registra consumos aproximados por período y tratamientos sanitarios; consulta los registros permitidos. Los pesajes se gestionan desde la ficha del animal según los permisos de cada acción.
 - Las funciones SQL validan la identidad y los permisos del perfil. Ocultar un botón no es el mecanismo de protección de datos.
 
 ## 3. Preparación de datos maestros
@@ -27,7 +27,7 @@ En escritorio la navegación es lateral fija; en pantallas pequeñas se abre des
 2. En **Catálogos**, crear razas, proveedores, unidades y categorías relevantes.
 3. Registrar productos con unidad base y stock mínimo.
 4. En **Inventario**, crear presentaciones comerciales y conversiones cuando correspondan.
-5. En **Alimentación**, crear planes, añadir sus productos y asignarlos a lotes activos cuando existan.
+5. En **Alimentación**, registrar consumos consolidados por lote y rango de fechas; no se crean recetas diarias ni se asignan planes.
 
 Las categorías y las unidades tienen que corresponder al uso real; registrar una presentación comercial no equivale a comprar stock.
 
@@ -87,18 +87,17 @@ El saldo se concilia como `entradas − salidas + ajustes firmados`; los registr
 
 ## 6. Alimentación y sanidad
 
-### Consumo real de alimentación
+### Registrar un consumo por período (vigente)
 
-1. Abrir **Alimentación → Registrar consumo**.
-2. Seleccionar lote activo, producto, cantidad en unidad base y fecha.
-3. Registrar. Se descuenta stock al PMP vigente y se imputa costo al lote.
+1. Entrar en **Alimentación** y pulsar **Registrar período**.
+2. Seleccionar un lote, **fecha desde** y **fecha hasta**. Se admiten intervalos ya finalizados, incluso si los animales del lote se ingresaron posteriormente desde SIPECweb.
+3. Añadir los insumos de **leche o concentrado** utilizados en ese intervalo. La cantidad corresponde al **total aproximado para el lote**, no a una ración individual ni a una jornada exacta.
+4. Opcionalmente elegir una presentación, como saco de 25 kg; SGIC transforma automáticamente esa cantidad a la unidad base y muestra el costo orientativo al PMP actual.
+5. Mantener la casilla **Descontar del inventario al registrar** para reconocer una salida única por cada producto y contabilizar el costo en el lote, en kardex y en rentabilidad. El inventario debe contener existencias suficientes.
+6. Para reconstruir una semana anterior cuyos insumos ya fueron utilizados y no deberían descontarse otra vez, desmarcar la casilla: el registro queda como **Solo estimación**, sin afectar inventario ni costos contabilizados.
+7. Confirmar el período. Consultar el historial compacto y expandir un registro para ver cantidades, costo orientativo y observaciones.
 
-### Consumo desde plan
-
-1. Crear el plan y su composición mediante **Alimentación → Crear plan** y **Añadir alimento al plan**.
-2. Asignarlo a un lote activo y registrar el inicio.
-3. En **Aplicar plan**, seleccionar la asignación y fecha.
-4. El procedimiento `sgic_consumo_desde_plan` genera consumo y salidas del inventario según los detalles del plan; no debe registrarse dos veces la ejecución del mismo plan y fecha.
+El sistema impide **períodos solapados del mismo lote**, valida fechas (hasta el día actual) y evita superponer consumos manuales ya registrados. El registro utiliza una solicitud idempotente para evitar duplicar descuentos ante reintentos. **Los consumos son aproximados:** no se interpretan como mediciones diarias ni individuales. La tarea de descuento automático diario y la lógica anterior de planes fueron retiradas.
 
 ### Tratamiento sanitario
 

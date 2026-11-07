@@ -10,19 +10,19 @@
 
 | Área | Capacidades disponibles |
 |---|---|
-| Resumen | Indicadores de animales activos, lotes, valor base de ganado e inventario; acceso a los registros |
+| Resumen | Indicadores esenciales de animales, lotes y alertas de stock; valorizaciones en sección opcional |
 | Animales | Registro de compras por DIIO, ingreso en lote, pesajes, rectificaciones, fallecimientos y filtros por estado |
 | SIPECweb | Conciliación de XLS del SAG e **incorporación supervisada** con tipo de ingreso, raza, lote y valor individual |
 | Lotes | Consulta y división de lotes, conservando el origen y las restricciones contables |
 | Inventario | Catálogo de productos, presentaciones, conversiones, stock, kardex y costo promedio ponderado (PMP) |
 | Compras | Compras de insumos, confirmación inmediata o borrador, detalle por producto/proveedor |
-| Alimentación | Planes, composición, asignaciones, consumo real y ejecución desde plan |
+| Alimentación | Consumos aproximados por lote y rango de fechas, retrospectivos, con descuento único opcional y costos orientativos |
 | Sanidad | Tratamientos, productos utilizados y costos |
 | Ventas y gastos | Venta estándar, **venta con precio individual por DIIO**, borradores, gastos y rentabilidad |
 | Solicitudes pendientes | Aprobación o anulación de borradores de **compras de insumos y ventas** |
 | Administración | Catálogos, perfiles con roles, auditoría y consultas operativas |
 
-La navegación se organiza en un menú lateral. Las operaciones se abren desde su módulo; no existe una pantalla independiente de operaciones.
+La navegación conserva el menú lateral. Cada pantalla muestra un registro resumido y una acción principal; las opciones secundarias y los detalles avanzados se abren únicamente cuando se necesitan. Los formularios sustituyen temporalmente el listado para no duplicar funciones.
 
 ## Inicio de sesión y perfiles
 
@@ -61,6 +61,14 @@ En **Ventas → Venta con precios por DIIO**, el administrador puede seleccionar
 
 La exportación XLS se procesa en el navegador; solo se envían a Supabase los DIIO seleccionados y los datos confirmados para su incorporación. No existe sincronización automática ni API SAG integrada. Consultar [Manual SIPECweb](docs/SIPEC_INTEGRACION.md).
 
+## Alimentación por períodos
+
+**Se retiraron los planes diarios y la ejecución automática de jornadas.** En **Alimentación → Registrar período** se elige un lote, la fecha desde/hasta y las cantidades globales aproximadas de leche y concentrados. Es posible registrar una semana ya transcurrida aunque los DIIO del lote se hayan importado más tarde.
+
+- **Consumo confirmado:** descuenta una sola vez las cantidades del inventario; registra sus costos en el lote, en kardex y en rentabilidad, sin atribuirlos a animales individuales ni inventar jornadas exactas.
+- **Estimación histórica:** conserva cantidades y costos orientativos, pero **no descuenta stock** ni modifica la rentabilidad contable; es apropiada para reconstruir períodos sin evidencia de existencias actuales.
+- El sistema rechaza períodos solapados del mismo lote y evita contabilizar las mismas jornadas manuales dos veces. La etiqueta **aproximado** se mantiene visible en el historial.
+
 ## Arquitectura
 
 ```mermaid
@@ -75,7 +83,7 @@ flowchart LR
 ```
 
 - **Frontend:** `frontend/`. La compilación de producción utiliza la URL y la clave pública publishable del proyecto Supabase autorizado; **nunca** una clave `service_role`/`sb_secret_`.
-- **Esquema de datos:** `supabase/migrations/`, 15 migraciones secuenciales versionadas; las tablas de dominio cuentan con RLS.
+- **Esquema de datos:** `supabase/migrations/`, migraciones SQL secuenciales versionadas; las tablas de dominio, incluidos los períodos de alimentación, cuentan con RLS.
 - **Integridad:** restricciones relacionales, DIIO único, kardex firmado, transacciones atómicas y funciones de autorización.
 - **Backend Django:** código legado conservado como referencia; no se ejecuta en Cloudflare Pages.
 

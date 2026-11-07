@@ -15,7 +15,7 @@ type Producto={
 }
 type Props={
   type:'animales'|'inventario';search:string;filter:AnimalFilter;
-  onFilter:(f:AnimalFilter)=>void;onOpenAnimal:(id:number)=>void;
+  onFilter:(f:AnimalFilter)=>void;onSearch:(value:string)=>void;onOpenAnimal:(id:number)=>void;
   revision:number;presentaciones:PresentacionStock[]
 }
 const format=(n:number)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:3}).format(n)
@@ -29,7 +29,7 @@ function Status({estado}:{estado:string}){
 }
 
 /** Listados con paginación real: cada página y contador se consultan en PostgreSQL. */
-export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revision,presentaciones}:Props){
+export function PaginatedRegistry({type,search,filter,onFilter,onSearch,onOpenAnimal,revision,presentaciones}:Props){
   const [page,setPage]=useState(0)
   const [term,setTerm]=useState(search.trim())
   const [animals,setAnimals]=useState<AnimalRow[]>([])
@@ -39,6 +39,7 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [retry,setRetry]=useState(0)
+  const [mostrarDetalle,setMostrarDetalle]=useState(false)
 
   useEffect(()=>{
     const id=window.setTimeout(()=>setTerm(search.trim().slice(0,120)),250)
@@ -107,10 +108,17 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
 
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-      <h2 className="font-semibold">{type==='animales'?'Registro de animales':'Inventario'}</h2>
-      <span role="status" aria-live="polite" className="text-xs tabular-nums text-slate-600">
-        {loading?'Cargando…':error?'Error':format(count)+' resultados'}
-      </span>
+      <h2 className="font-semibold">{type==='animales'?'Listado':'Existencias'}</h2>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <input type="search" aria-label={type==='animales'?'Buscar animales':'Buscar insumos'} value={search} onChange={e=>onSearch(e.target.value)} placeholder={type==='animales'?'Buscar DIIO, raza o lote':'Buscar insumo'} className="w-full min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm sm:w-60"/>
+        <span role="status" aria-live="polite" className="text-xs tabular-nums text-slate-600">
+          {loading?'Cargando…':error?'Error':format(count)+' resultados'}
+        </span>
+        <button type="button" aria-pressed={mostrarDetalle} onClick={()=>setMostrarDetalle(x=>!x)}
+          className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 md:block">
+          {mostrarDetalle?'Vista simple':'Más columnas'}
+        </button>
+      </div>
     </div>
     {type==='animales'&&<div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3" aria-label="Filtrar animales por estado">
       {states.map(state=><button key={state} type="button" aria-pressed={filter===state}
@@ -148,13 +156,13 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
       </div>
       <div className="hidden md:block">
         <TableScroll><table className="min-w-full text-left text-sm">
-          <thead><tr>{['DIIO / ficha','Raza','Lote','Sexo','Peso inicial','Valor base','Estado'].map(label=><th scope="col" key={label} className="p-3 text-xs font-semibold text-slate-600">{label}</th>)}</tr></thead>
+          <thead><tr>{['DIIO / ficha','Raza','Lote',...(mostrarDetalle?['Sexo','Peso inicial','Valor base']:[]),'Estado'].map(label=><th scope="col" key={label} className="p-3 text-xs font-semibold text-slate-600">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">{animals.map(a=><tr key={a.id} className="hover:bg-slate-50">
             <td className="p-3 font-semibold"><button type="button" onClick={()=>onOpenAnimal(a.id)} aria-label={'Abrir ficha DIIO '+a.diio}
               className="min-h-10 text-emerald-800 underline underline-offset-4">{a.diio}</button></td>
             <td className="p-3">{a.raza_nombre??'—'}</td><td className="p-3">{a.lote_codigo??'—'}</td>
-            <td className="p-3">{a.sexo}</td><td className="p-3">{a.peso_ingreso_kg!=null?format(a.peso_ingreso_kg)+' kg':'—'}</td>
-            <td className="p-3 tabular-nums">{money(a.precio_adquisicion)}</td><td className="p-3"><Status estado={a.estado}/></td>
+            {mostrarDetalle&&<><td className="p-3">{a.sexo}</td><td className="p-3">{a.peso_ingreso_kg!=null?format(a.peso_ingreso_kg)+' kg':'—'}</td>
+            <td className="p-3 tabular-nums">{money(a.precio_adquisicion)}</td></>}<td className="p-3"><Status estado={a.estado}/></td>
           </tr>)}</tbody>
         </table></TableScroll>
       </div>
@@ -183,16 +191,17 @@ export function PaginatedRegistry({type,search,filter,onFilter,onOpenAnimal,revi
       </div>
       <div className="hidden md:block">
         <TableScroll><table className="min-w-full text-left text-sm">
-          <thead><tr>{['Producto','Existencia','Mínimo','PMP','Valorización'].map(label=><th scope="col" key={label} className="p-3 text-xs font-semibold text-slate-600">{label}</th>)}</tr></thead>
+          <thead><tr>{['Producto','Existencia','Estado',...(mostrarDetalle?['Mínimo','PMP','Valorización']:[])].map(label=><th scope="col" key={label} className="p-3 text-xs font-semibold text-slate-600">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">{products.map(p=>{
             const unit=p.unidad_medida?.codigo??'unidad'
             return <tr key={p.id} className="hover:bg-slate-50">
               <td className="p-3 font-semibold">{p.nombre}</td>
               <td className="p-3"><div className="font-semibold tabular-nums">{format(p.stock_actual)} {unit}</div>
-                <StockPresentations stock={Number(p.stock_actual)} unidad={unit} presentaciones={presentaciones.filter(x=>x.producto_id===p.id)}/></td>
-              <td className="p-3">{format(p.stock_minimo)} {unit}</td>
-              <td className="p-3 tabular-nums">{money(p.costo_promedio)}</td>
-              <td className="p-3 tabular-nums">{money(p.stock_actual*p.costo_promedio)}</td>
+                {mostrarDetalle&&<StockPresentations stock={Number(p.stock_actual)} unidad={unit} presentaciones={presentaciones.filter(x=>x.producto_id===p.id)}/>}</td>
+              <td className="p-3 text-xs">{Number(p.stock_actual)<=Number(p.stock_minimo)?<span className="font-semibold text-amber-800">Stock bajo</span>:<span className="text-slate-500">Normal</span>}</td>
+              {mostrarDetalle&&<><td className="p-3">{format(p.stock_minimo)} {unit}</td>
+                <td className="p-3 tabular-nums">{money(p.costo_promedio)}</td>
+                <td className="p-3 tabular-nums">{money(p.stock_actual*p.costo_promedio)}</td></>}
             </tr>
           })}</tbody>
         </table></TableScroll>

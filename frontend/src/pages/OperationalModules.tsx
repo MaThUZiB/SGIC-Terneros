@@ -17,7 +17,6 @@ const S: Record<string, Spec> = {
   ingresoInsumo:{title:'Ingresar insumos',role:'ADMIN',fields:[],help:''},
   usoInsumo:{title:'Registrar uso',role:'TODOS',fields:[],help:''},
   perdidaInsumo:{title:'Registrar pérdida',role:'TODOS',fields:[],help:''},
-  configInsumo:{title:'Uso en planes',role:'ADMIN',fields:[],help:''},
   compraAnimal: { title:'Compra / ingreso de ternero',role:'ADMIN',help:'DIIO único. Para agregar a lote existente, deja vacío el código de lote nuevo.',
     fields:[F('lote_id','Lote existente (opcional)','lote',undefined,true),F('lote_codigo','Código de lote nuevo',undefined,'text',true),F('proveedor_id','Proveedor','proveedor',undefined,true),
       F('diio','DIIO'),F('raza_id','Raza','raza'),F('sexo','Sexo','sexo'),F('edad','Edad aproximada (días)',undefined,'number'),F('precio','Costo adquisición (CLP)',undefined,'number'),F('peso','Peso inicial (kg)',undefined,'number',true),F('fecha','Fecha',undefined,'date')] },
@@ -35,21 +34,18 @@ const S: Record<string, Spec> = {
   confirmarVenta:{title:'Confirmar venta borrador',role:'ADMIN',help:'Congela el ingreso, los costos y los animales seleccionados. Es una operación irreversible.',fields:[F('venta_id','Borrador pendiente','venta')]},
   anularVenta:{title:'Anular venta borrador',role:'ADMIN',help:'Anula el borrador sin modificar el estado de los animales.',fields:[F('venta_id','Borrador pendiente','venta')]},
   venta: {title:'Confirmar venta por DIIO',role:'ADMIN',help:'Selecciona los animales exactos y registra ingreso y costos reconocidos. No se puede deshacer una venta confirmada.',fields:[F('comprador','Comprador',undefined,'text',true),F('total','Monto de venta (CLP)',undefined,'number'),F('fecha','Fecha',undefined,'date')]},
-  planDetalle:{title:'Agregar producto a plan',role:'ADMIN',help:'La cantidad se interpreta por ternero o por lote según el modo del plan seleccionado, en la unidad base del insumo. Habilita insumos en Inventario → Uso en planes.',fields:[F('plan_id','Plan','plan_consumo'),F('producto_id','Producto','producto'),F('cantidad','Cantidad diaria (según modalidad del plan)',undefined,'number')]},
-  consumoPlan:{title:'Ejecutar consumo desde plan',role:'TODOS',help:'Aplica el plan diario, descuenta stock y evita repetirlo en la misma fecha.',fields:[F('asignacion_id','Asignación vigente','asignacion_plan_lote'),F('fecha','Fecha',undefined,'date')]},
-  asignarPlan:{title:'Asignar plan alimentario a lote',role:'ADMIN',help:'Asigna la alimentación planificada a un lote activo.',fields:[F('plan_id','Plan','plan_consumo'),F('lote_id','Lote','lote'),F('fecha','Fecha de inicio',undefined,'date')]},
   presentacion:{title:'Presentación comercial',role:'ADMIN',help:'Equivalencia entre envase comercial y unidad base del producto.',fields:[F('producto_id','Producto','producto'),F('nombre','Nombre de presentación'),F('cantidad','Cantidad en unidad base',undefined,'number')]},
   conversion:{title:'Conversión de unidades',role:'ADMIN',help:'Solo se admiten conversiones dentro de la misma dimensión (masa o volumen).',fields:[F('producto_id','Producto','producto'),F('origen_id','Unidad origen','unidad_medida'),F('origen_cantidad','Cantidad origen',undefined,'number'),F('destino_id','Unidad destino','unidad_medida'),F('destino_cantidad','Cantidad destino',undefined,'number')]},
   productoEditar:{title:'Actualizar producto',role:'ADMIN',help:'Corrige nombre, stock mínimo o estado, sin alterar movimientos históricos.',fields:[F('producto_id','Producto','producto'),F('nombre','Nombre actualizado'),F('minimo','Stock mínimo',undefined,'number'),F('activo','Estado','estado_activo')]},
   animalRectificar:{title:'Rectificación de animal',role:'ADMIN',help:'Selecciona un sexo válido y explica el motivo (mínimo cinco caracteres). No necesita fecha; DIIO y costo se conservan.',fields:[F('animal_id','DIIO','animal'),F('sexo','Sexo','sexo'),F('motivo','Motivo de rectificación')]},
-  catalogo:{title:'Crear maestro / catálogo',role:'ADMIN',help:'Registra proveedores, razas, unidades, productos, categorías, lotes o planes.',fields:[F('tipo','Tipo','tipo'),F('nombre','Nombre / código')]},
+  catalogo:{title:'Crear maestro / catálogo',role:'ADMIN',help:'Registra proveedores, razas, unidades, productos, categorías o lotes.',fields:[F('tipo','Tipo','tipo'),F('nombre','Nombre / código')]},
 }
 const contextualActions: Partial<Record<ModuleId,string[]>> = {
-  animales:['compraAnimal','peso','fallecimiento','animalRectificar'],
-  lotes:['division','catalogo'],
-  inventario:['ingresoInsumo','usoInsumo','perdidaInsumo','configInsumo','productoEditar','ajuste'],
+  animales:['compraAnimal'],
+  lotes:['catalogo','division'],
+  inventario:['usoInsumo','perdidaInsumo','productoEditar','ajuste'],
   compras:['ingresoInsumo'],
-  planes:['planDetalle','catalogo'],
+  planes:[],
   sanidad:['tratamiento'],
   ventas:['venta','borradorVenta'],
   gastos:['gasto'],
@@ -60,19 +56,18 @@ const contextualLabels:Record<string,string>={
   animalRectificar:'Rectificar',division:'Dividir lote',compraInsumo:'Comprar insumos',
   ajuste:'Ajustar stock',presentacion:'Crear presentación',conversion:'Crear conversión',
   productoEditar:'Editar producto',catalogo:'Crear nuevo registro',
-  consumo:'Registrar consumo',consumoPlan:'Confirmar alimentación del día',planDetalle:'Añadir alimento al plan',
-  asignarPlan:'Asignar plan',tratamiento:'Registrar tratamiento',venta:'Registrar venta',
+  consumo:'Registrar consumo',
   borradorVenta:'Solicitar venta',gasto:'Registrar gasto',
 }
 export function getModuleActions(module:ModuleId,esAdmin:boolean){
   return (contextualActions[module]??[]).filter(id=>esAdmin||S[id].role==='TODOS')
-    .map(id=>({id,label:contextualLabels[id]??S[id].title}))
+    .map(id=>({id,label:module==='lotes'&&id==='catalogo'?'Crear lote':contextualLabels[id]??S[id].title}))
 }
 const catalogs = [
   {id:'raza',nombre:'Raza'},{id:'proveedor',nombre:'Proveedor'},
   {id:'categoria_producto',nombre:'Categoría producto'},{id:'categoria_gasto',nombre:'Categoría gasto'},
   {id:'unidad_medida',nombre:'Unidad de medida'},{id:'producto',nombre:'Producto'},
-  {id:'plan_consumo',nombre:'Plan de consumo'},{id:'lote',nombre:'Lote vacío'},
+  {id:'lote',nombre:'Lote vacío'},
 ]
 const fechaLocal=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 const base=():Record<string,string>=>({fecha:fechaLocal(),confirmar_ahora:'SI'})
@@ -99,7 +94,6 @@ const boxClass='w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 t
 function label(o: Opt, source: string) {
   if(source==='animal') return o.diio || String(o.id)
   if(source==='lote') return o.codigo || String(o.id)
-  if(source==='asignacion_plan_lote') return 'Asignación #' + o.id + ' · lote ' + String(o.lote_id)
   if(source==='venta') return 'Venta #' + o.id
   if(source==='compra') return '#' + o.id + ' · ' + (o.numero_documento || 'Borrador') + ' · ' + String(o.total)
   return o.nombre || o.codigo || String(o.id)
@@ -120,7 +114,6 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
       if(v.tipo==='unidad_medida'){extra.codigo=v.codigo;extra.tipo=v.tipo_unidad}
       if(v.tipo==='proveedor'){extra.rut=v.rut||null;extra.email=v.email||null}
       if(v.tipo==='lote')extra.fecha_ingreso=v.fecha||fechaLocal()
-      if(v.tipo==='plan_consumo')extra.descripcion=v.descripcion||null
       params={p_tipo:v.tipo,p_nombre:v.nombre,p_opciones:extra};break
     }
     case 'compraAnimal':
@@ -152,9 +145,6 @@ async function callOperation(op: string, v: Record<string,string>, selected: num
     case 'confirmarVenta':method='sgic_confirmar_borrador_venta';params={p_venta_id:n(v.venta_id)};break
     case 'anularVenta':method='sgic_anular_borrador_venta';params={p_venta_id:n(v.venta_id)};break
     case 'venta':method='sgic_confirmar_venta';params={p_animal_ids:selected,p_total:n(v.total),p_comprador:v.comprador||'',p_fecha:v.fecha};break
-    case 'planDetalle':method='sgic_plan_detalle';params={p_plan_id:n(v.plan_id),p_producto_id:n(v.producto_id),p_cantidad_diaria:n(v.cantidad)};break
-    case 'consumoPlan':method='sgic_consumo_desde_plan';params={p_asignacion_id:n(v.asignacion_id),p_fecha:v.fecha};break
-    case 'asignarPlan':method='sgic_asignar_plan';params={p_plan_id:n(v.plan_id),p_lote_id:n(v.lote_id),p_inicio:v.fecha};break
     default:throw Error('Operación no soportada')
   }
   const result=await supabase.rpc(method,params)
@@ -170,7 +160,7 @@ export function OperationalModules({
   const allowed=getModuleActions(module,esAdmin)
   const action=initialAction
   const fixedCatalogType=action==='catalogo'
-    ? module==='lotes'?'lote':module==='inventario'?'producto':module==='planes'?'plan_consumo':catalogs.some(c=>c.id===initialCatalogType)?initialCatalogType!:null
+    ? module==='lotes'?'lote':module==='inventario'?'producto':catalogs.some(c=>c.id===initialCatalogType)?initialCatalogType!:null
     :null
   const initialValues=()=>({...base(),...(initialAnimalId?{animal_id:String(initialAnimalId)}:{}),...(fixedCatalogType?{tipo:fixedCatalogType}:{})})
   const [lists,setLists]=useState<Lists>({})
@@ -187,7 +177,7 @@ export function OperationalModules({
   async function refresh(){
     if(!supabase)return
     setLoading(true)
-    const keys=['animal','lote','raza','proveedor','producto','venta','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','plan_consumo','asignacion_plan_lote','presentacion_producto']
+    const keys=['animal','lote','raza','proveedor','producto','venta','compra_insumo','categoria_producto','unidad_medida','categoria_gasto','presentacion_producto']
     const results=await Promise.all(keys.map(k=>supabase!.from(k).select('*').order('id',{ascending:true}).limit(1000)))
     const next:Lists={}
     results.forEach((r,i)=>{next[keys[i]==='compra_insumo'?'compra':keys[i]]=(r.data||[]) as Opt[]})
@@ -200,10 +190,8 @@ export function OperationalModules({
     values.tipo==='producto'?[F('categoria_id','Categoría de producto','categoria_producto'),F('unidad_base_id','Unidad base','unidad_medida'),F('stock_minimo','Stock mínimo',undefined,'number',true)]:
     values.tipo==='unidad_medida'?[F('codigo','Código abreviado'),F('tipo_unidad','Tipo (MASA / VOLUMEN)')]:
     values.tipo==='proveedor'?[F('rut','RUT',undefined,'text',true),F('email','Email',undefined,'email',true)]:
-    values.tipo==='plan_consumo'?[F('descripcion','Descripción',undefined,'text',true)]:
     values.tipo==='lote'?[F('fecha','Fecha',undefined,'date')]:[] :[]
   function options(source:string):Opt[]{
-    if(source==='producto'&&action==='planDetalle')return (lists.producto??[]).filter(p=>p.activo&&p.apto_plan)
     if(source==='tipo')return catalogs
     if(source==='estado_activo')return [{id:'SI',nombre:'Activo'},{id:'NO',nombre:'Inactivo'}]
     if(source==='modo_compra')return [{id:'SI',nombre:'Confirmar ahora: ingresar stock y actualizar PMP'},{id:'NO',nombre:'Enviar a Solicitudes pendientes: no ingresa inventario'}]
@@ -211,7 +199,6 @@ export function OperationalModules({
     const arr=lists[source]||[]
     if(source==='compra'||source==='venta')return arr.filter(o=>o.estado==='BORRADOR')
     if(source==='presentacion_producto')return arr.filter(o=>o.activo!==false && String(o.producto_id)===values.producto_id)
-    if(source==='asignacion_plan_lote')return arr.filter(o=>o.activo!==false)
     if(source==='lote'||source==='animal')return arr.filter(o=>o.estado==='ACTIVO')
     return arr.filter(o=>o.activo!==false)
   }
@@ -313,7 +300,7 @@ export function OperationalModules({
   const panelTitle=action==='catalogo'&&fixedCatalogType
     ?'Crear '+(catalogs.find(c=>c.id===fixedCatalogType)?.nombre.toLocaleLowerCase()??'registro')
     :S[action].title
-  const panelHelp=action==='catalogo'&&fixedCatalogType?({raza:'Agrega una raza para identificar los animales.',proveedor:'Guarda el nombre del proveedor. RUT y correo son opcionales.',categoria_gasto:'Crea una categoría para organizar los gastos del negocio.',unidad_medida:'Define la unidad y su abreviatura para medir existencias.',categoria_producto:'Agrega una clasificación para los insumos.',producto:'Crea un producto sin existencias. Para ingresar stock, utiliza Inventario.',plan_consumo:'Los planes nuevos calculan la ración por ternero automáticamente. Luego añade los alimentos, asigna el plan al lote y SGIC descontará el stock cada jornada.',lote:'Crea un lote para agrupar los animales.'} as Record<string,string>)[fixedCatalogType]:S[action].help
+  const panelHelp=action==='catalogo'&&fixedCatalogType?({raza:'Agrega una raza para identificar los animales.',proveedor:'Guarda el nombre del proveedor. RUT y correo son opcionales.',categoria_gasto:'Crea una categoría para organizar los gastos del negocio.',unidad_medida:'Define la unidad y su abreviatura para medir existencias.',categoria_producto:'Agrega una clasificación para los insumos.',producto:'Crea un producto sin existencias. Para ingresar stock, utiliza Inventario.',lote:'Crea un lote para agrupar los animales.'} as Record<string,string>)[fixedCatalogType]:S[action].help
   return <section className="operation-panel rounded-xl border border-slate-200 bg-white p-4 sm:p-6" aria-label={panelTitle}>
     <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
       <div className="min-w-0">
@@ -331,7 +318,6 @@ export function OperationalModules({
             <div key={f.key} className="block text-sm">
               <label htmlFor={fieldId+f.key} className="mb-1.5 block font-medium">{action==='compraInsumo'&&f.key==='precio'
                 ?(precioPresentacion?'Precio de cada presentación (CLP)':'Precio por unidad base (CLP)')
-                :action==='planDetalle'&&f.key==='cantidad'?(lists.plan_consumo?.find(p=>String(p.id)===values.plan_id)?.modo_racion==='ANIMAL'?'Cantidad diaria por ternero (unidad base)':'Cantidad diaria total del lote (unidad base)')
                 :action==='catalogo'&&fixedCatalogType&&f.key==='nombre'?(fixedCatalogType==='lote'?'Código del lote':'Nombre'):f.label}</label>
               {f.source==='animal'?
                 <AnimalSearch inputId={fieldId+f.key} options={options('animal').map(o=>({id:o.id,diio:o.diio||String(o.id),detail:animalDetail(o)}))}
@@ -404,12 +390,12 @@ const views:Record<string,string[]> = {
   presentacion_producto:['producto_id','nombre','cantidad_base','activa'],
   conversion_producto:['producto_id','unidad_origen_id','cantidad_origen','unidad_destino_id','cantidad_destino','activa'],
   consumo:['fecha','lote_id','origen'],
+  periodo_alimentacion:['lote_id','fecha_inicio','fecha_fin','estado'],
+  detalle_periodo_alimentacion:['periodo_id','producto_id','cantidad_total','costo_referencia'],
   tratamiento:['fecha','animal_id','motivo','costo_total'],
   gasto:['fecha','nombre','monto','lote_id'],
   venta:['fecha','comprador','estado','total_venta'],
   detalle_venta:['venta_id','lote_id','cantidad_animales','ingreso','costo_reconocido','utilidad'],
-  plan_consumo:['nombre','activo'],
-  asignacion_plan_lote:['lote_id','plan_id','fecha_inicio','activo'],
   registro_auditoria:['fecha_hora','accion','modelo','objeto_id'],
 }
 export function OperationsHistory({esAdmin}:{esAdmin:boolean}){

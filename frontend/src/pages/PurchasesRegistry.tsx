@@ -18,7 +18,7 @@ const date=(value:string)=>value.split('-').reverse().join('/')
 
 /** Consultas de compras y sus detalles limitadas a la página visible. */
 export function PurchasesRegistry({revision,providers,products,animals,onPending}:Props){
-  const [type,setType]=useState<'animales'|'insumos'>('animales')
+  const [type,setType]=useState<'animales'|'insumos'>('insumos')
   const [page,setPage]=useState(0)
   const [total,setTotal]=useState(0)
   const [animalRows,setAnimalRows]=useState<CompraAnimal[]>([])

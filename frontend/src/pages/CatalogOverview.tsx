@@ -1,7 +1,5 @@
-import type { ModuleId } from '../components/SidebarNavigation'
-
 /** Accesos de configuración sin textos introductorios redundantes. */
-export function CatalogOverview({onCreate,onNavigate}:{onCreate:(type:string)=>void;onNavigate:(module:ModuleId)=>void}){
+export function CatalogOverview({onCreate}:{onCreate:(type:string)=>void}){
  const catalogs=[
   {id:'raza',title:'Razas'},
   {id:'proveedor',title:'Proveedores'},

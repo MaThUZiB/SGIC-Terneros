@@ -8,7 +8,7 @@ La base activa de SGIC-Terneros utiliza **Supabase PostgreSQL** con Auth, RLS y 
 
 ## 2. Organización
 
-- `migrations/`: 15 migraciones SQL del esquema relacional, RLS, perfiles, funciones, índices y correcciones incrementales.
+- `migrations/`: migraciones SQL secuenciales del esquema relacional, RLS, perfiles, funciones, períodos de alimentación, índices y correcciones incrementales.
 - `tests/integrity_audit.sql`: controles de solo lectura de stock, lotes, compras y DIIO.
 - `tests/operational_smoke_rollback.sql`: ensayos transaccionales que se revierten; revisar instrucciones antes de ejecutar.
 - `seeds/demo_20261012.sql`: **exclusivamente datos ficticios para entornos aislados**. No ejecutar en producción.

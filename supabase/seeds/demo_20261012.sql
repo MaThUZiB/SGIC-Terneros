@@ -104,11 +104,11 @@ begin
   insert into public.unidad_medida(codigo,nombre,tipo,decimales) values
     ('ml','Mililitro','VOLUMEN',3) returning id into v_ml;
 
-  insert into public.producto(nombre,categoria_id,unidad_base_id,stock_actual,stock_minimo,costo_promedio,observaciones)
-     values('Sustituto lácteo DEMO',v_categoria_alimento,v_kg,0,25,0,'Sin existencias; compras en borrador no afectan stock')
+  insert into public.producto(nombre,categoria_id,unidad_base_id,stock_actual,stock_minimo,costo_promedio,observaciones,tipo_insumo)
+     values('Sustituto lácteo DEMO',v_categoria_alimento,v_kg,0,25,0,'Sin existencias; compras en borrador no afectan stock','LECHE')
      returning id into v_leche;
-  insert into public.producto(nombre,categoria_id,unidad_base_id,stock_actual,stock_minimo,costo_promedio,observaciones)
-     values('Concentrado iniciador DEMO',v_categoria_alimento,v_kg,0,50,0,'Sin existencias')
+  insert into public.producto(nombre,categoria_id,unidad_base_id,stock_actual,stock_minimo,costo_promedio,observaciones,tipo_insumo)
+     values('Concentrado iniciador DEMO',v_categoria_alimento,v_kg,0,50,0,'Sin existencias','CONCENTRADO')
      returning id into v_concentrado;
   insert into public.producto(nombre,categoria_id,unidad_base_id,stock_actual,stock_minimo,costo_promedio)
      values('Heno DEMO',v_categoria_alimento,v_kg,0,50,0)
